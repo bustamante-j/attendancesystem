@@ -1,0 +1,44 @@
+project_id = "kcp-attendance"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+extra_search_path = ["public", "extensions"]
+max_rows = 1000
+
+[db]
+port = 54322
+major_version = 15
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://localhost:5173"
+additional_redirect_urls = ["http://127.0.0.1:5173"]
+jwt_expiry = 3600
+enable_signup = false
+
+[functions.create-user]
+verify_jwt = true
+
+[functions.reset-user-password]
+verify_jwt = true
+
+[functions.issue-student-qr]
+verify_jwt = true
+
+[functions.create-event]
+verify_jwt = true
+
+[functions.reset-event-pin]
+verify_jwt = true
+
+[functions.batch-issue-student-qrs]
+verify_jwt = true
+
+[functions.update-user]
+verify_jwt = true

@@ -1,0 +1,8 @@
+export function friendlyError(error: unknown, fallback = 'Something went wrong. Please try again.') {
+  if (error instanceof Error) return error.message || fallback
+  if (typeof error === 'object' && error && 'message' in error) {
+    const message = (error as { message?: unknown }).message
+    if (typeof message === 'string' && message) return message
+  }
+  return fallback
+}
