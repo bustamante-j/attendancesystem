@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Modal } from '../../components/Modal'
+import { useConfirm } from '../../components/ConfirmDialog'
 import { friendlyError } from '../../lib/errors'
 import { correctAttendance, removeAttendance } from '../../services/reports'
 import type { AttendanceReportRow, EventRecord } from '../../types/app'
@@ -11,6 +12,7 @@ export function AttendanceEditModal({ eventRecord, row, onClose, onSaved }: {
   onClose: () => void
   onSaved: (message: string) => Promise<void>
 }) {
+  const confirm = useConfirm()
   const [checkInAt, setCheckInAt] = useState(toDateTimeLocal(row.check_in_at ?? eventRecord.start_at))
   const [status, setStatus] = useState<'present' | 'late'>(row.attendance_status === 'late' ? 'late' : 'present')
   const [checkOutAt, setCheckOutAt] = useState(row.check_out_at ? toDateTimeLocal(row.check_out_at) : '')
@@ -42,7 +44,7 @@ export function AttendanceEditModal({ eventRecord, row, onClose, onSaved }: {
   }
 
   const markAbsent = async () => {
-    if (!row.check_in_at || !window.confirm(`Remove ${row.full_name}'s attendance record and mark them absent?`)) return
+    if (!row.check_in_at || !await confirm({ title: 'Mark student absent?', message: `${row.full_name}'s attendance record will be removed from this event.`, confirmLabel: 'Mark absent', tone: 'danger' })) return
     setBusy(true)
     setError(null)
     try {

@@ -69,12 +69,12 @@ export function ScannerCamera({ enabled, processing, onDecode, onError }: {
   }, [enabled])
 
   return (
-    <div className="relative aspect-[3/4] max-h-[68vh] min-h-80 overflow-hidden rounded-xl bg-slate-950 sm:aspect-video">
+    <div className="relative aspect-[3/4] max-h-[58svh] min-h-80 overflow-hidden rounded-xl bg-slate-950 ring-1 ring-white/10 sm:aspect-video sm:max-h-[68vh]">
       <video ref={videoRef} className="h-full w-full object-cover" muted playsInline aria-label="QR scanner camera preview" />
       {!enabled && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-slate-300">
-          <Camera size={42} />
-          <span className="text-sm">Camera is off</span>
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.14),transparent_50%)] text-slate-300">
+          <span className="grid h-16 w-16 place-items-center rounded-2xl bg-white/10"><Camera size={32} /></span>
+          <span className="text-sm font-medium">Camera is ready to start</span>
         </div>
       )}
       {starting && (
@@ -85,9 +85,11 @@ export function ScannerCamera({ enabled, processing, onDecode, onError }: {
       )}
       {enabled && !starting && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className={`h-52 w-52 rounded-2xl border-4 transition ${processing ? 'border-blue-400' : 'border-white/90'}`}>
+          <div className={`relative h-52 w-52 rounded-2xl border-4 shadow-[0_0_0_999px_rgba(2,6,23,0.22)] transition sm:h-56 sm:w-56 ${processing ? 'border-blue-400' : 'border-white/90'}`}>
+            {!processing && <span className="scanner-line absolute inset-x-3 top-4 h-0.5 bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.9)]" />}
             <span className="sr-only">Place the QR code inside the frame</span>
           </div>
+          <span className="absolute bottom-5 rounded-full bg-slate-950/65 px-3 py-1.5 text-xs font-medium text-white backdrop-blur">Align the QR code inside the frame</span>
         </div>
       )}
       {processing && (

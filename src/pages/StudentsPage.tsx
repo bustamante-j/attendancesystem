@@ -1,6 +1,8 @@
-import { FileUp, KeyRound, Pencil, Plus, Printer, RotateCcw, Trash2 } from 'lucide-react'
+import { FileUp, KeyRound, Pencil, Plus, Printer, RotateCcw, SearchX, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert } from '../components/Alert'
+import { useConfirm } from '../components/ConfirmDialog'
+import { EmptyState } from '../components/EmptyState'
 import { LoadingScreen } from '../components/LoadingScreen'
 import { SearchInput } from '../components/SearchInput'
 import { useAuth } from '../features/auth/AuthProvider'
@@ -16,6 +18,7 @@ import { formatManilaDate } from '../utils/dates'
 const PAGE_SIZE = 25
 
 export function StudentsPage() {
+  const confirm = useConfirm()
   const { profile } = useAuth()
   const isAdmin = profile?.role === 'super_admin'
   const [students, setStudents] = useState<Student[]>([])
@@ -81,7 +84,7 @@ export function StudentsPage() {
     catch (cause) { setMessage({ text: friendlyError(cause), tone: 'error' }) }
   }
   const remove = async (student: Student) => {
-    if (!window.confirm(`Soft delete ${student.full_name}? Attendance history will be preserved.`)) return
+    if (!await confirm({ title: 'Delete student?', message: `${student.full_name} will be removed from current records. Attendance history will be preserved.`, confirmLabel: 'Delete student', tone: 'danger' })) return
     try {
       await softDeleteStudent(student.id)
       setSelected((current) => { const next = new Set(current); next.delete(student.id); return next })
@@ -94,7 +97,7 @@ export function StudentsPage() {
   }
   const issueOne = async (student: Student) => {
     const verb = qrStatuses.get(student.id)?.has_active_credential ? 'Regenerate' : 'Issue'
-    if (!window.confirm(`${verb} the credential for ${student.full_name}? Regeneration permanently revokes the current credential.`)) return
+    if (!await confirm({ title: `${verb} QR credential?`, message: `${verb === 'Regenerate' ? 'The current credential will be permanently revoked. ' : ''}A new credential will be created for ${student.full_name}.`, confirmLabel: `${verb} credential`, tone: verb === 'Regenerate' ? 'danger' : 'primary' })) return
     setBusy(true)
     try {
       const result = await issueStudentQr(student.id)
@@ -106,7 +109,7 @@ export function StudentsPage() {
   const issueBatch = async () => {
     const ids = [...selected].filter((id) => students.some((student) => student.id === id && !student.deleted_at))
     if (!ids.length) return
-    if (!window.confirm(`Issue new credentials for ${ids.length} students? Every existing credential in this selection will be revoked.`)) return
+    if (!await confirm({ title: 'Issue new QR credentials?', message: `New credentials will be created for ${ids.length} students. Every existing credential in this selection will be revoked.`, confirmLabel: `Issue ${ids.length} credentials`, tone: 'danger' })) return
     setBusy(true)
     try {
       const result = await batchIssueStudentQrs(ids)
@@ -131,12 +134,12 @@ export function StudentsPage() {
   if (loading) return <LoadingScreen />
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div><h1 className="text-2xl font-bold">Students</h1><p className="mt-1 text-sm text-slate-500">Manage records, imports, and secure QR credentials.</p></div>
+      <div className="page-header">
+        <div><h1 className="page-title">Students</h1><p className="page-subtitle">Manage records, imports, and secure QR credentials.</p></div>
         {isAdmin && <div className="flex flex-wrap gap-2"><button className="btn-secondary" onClick={() => setShowImport(true)}><FileUp size={17} /> Import</button><button className="btn-primary" onClick={() => { setMessage(null); setEditing(null) }}><Plus size={17} /> Add student</button></div>}
       </div>
       {message && <Alert message={message.text} tone={message.tone} />}
-      <div className="panel flex flex-wrap gap-3 p-4">
+      <div className="toolbar">
         <SearchInput value={search} onChange={(value) => { setSearch(value); setPage(1) }} placeholder="Search Student ID or name" />
         <select className="field max-w-56" value={departmentFilter} onChange={(event) => { setDepartmentFilter(event.target.value); setPage(1) }}><option value="all">All departments</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.code}</option>)}</select>
         <select className="field max-w-44" value={yearFilter} onChange={(event) => { setYearFilter(event.target.value); setPage(1) }}><option value="all">All year levels</option>{[1, 2, 3, 4].map((year) => <option key={year} value={year}>Year {year}</option>)}</select>
@@ -157,7 +160,7 @@ export function StudentsPage() {
                 {isAdmin && <td><div className="flex flex-wrap gap-2">{student.deleted_at ? <button className="btn-secondary" onClick={() => void restore(student)}><RotateCcw size={14} /> Restore</button> : <><button className="btn-secondary" onClick={() => setEditing(student)}><Pencil size={14} /> Edit</button><button className="btn-secondary" onClick={() => void toggleActive(student)}>{student.is_active ? 'Deactivate' : 'Activate'}</button><button className="btn-secondary" disabled={busy} onClick={() => void issueOne(student)}>{qr?.has_active_credential ? <RotateCcw size={14} /> : <KeyRound size={14} />}{qr?.has_active_credential ? 'Regenerate QR' : 'Issue QR'}</button><button className="btn-danger" onClick={() => void remove(student)}><Trash2 size={14} /></button></>}</div></td>}
               </tr>
             })}
-            {!pageRows.length && <tr><td colSpan={isAdmin ? 10 : 6} className="py-10 text-center text-slate-500">No students match the filters.</td></tr>}
+            {!pageRows.length && <tr><td colSpan={isAdmin ? 10 : 6}><EmptyState compact icon={SearchX} title="No students found" description="Try changing the search or filters." /></td></tr>}
           </tbody>
         </table>
       </div>

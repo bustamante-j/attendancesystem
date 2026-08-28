@@ -1,7 +1,8 @@
-import { Activity, BarChart3, ScanLine } from 'lucide-react'
+import { Activity, BarChart3, Building2, CalendarDays, CalendarX2, ScanLine, Users, UserRoundCog } from 'lucide-react'
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Alert } from '../components/Alert'
+import { EmptyState } from '../components/EmptyState'
 import { LoadingScreen } from '../components/LoadingScreen'
 import { useAuth } from '../features/auth/AuthProvider'
 import { friendlyError } from '../lib/errors'
@@ -54,31 +55,34 @@ export function DashboardPage() {
 
   if (!counts && !error) return <LoadingScreen />
   const cards = [
-    ['Active Students', counts?.students ?? 0],
-    ['Departments', counts?.departments ?? 0],
-    ['Events', counts?.events ?? 0],
-    ...(profile?.role === 'super_admin' ? [['Users', counts?.users ?? 0] as [string, number]] : []),
+    { label: 'Active Students', count: counts?.students ?? 0, icon: Users, color: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300' },
+    { label: 'Departments', count: counts?.departments ?? 0, icon: Building2, color: 'bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300' },
+    { label: 'Events', count: counts?.events ?? 0, icon: CalendarDays, color: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300' },
+    ...(profile?.role === 'super_admin' ? [{ label: 'Staff Users', count: counts?.users ?? 0, icon: UserRoundCog, color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' }] : []),
   ]
   return (
     <div className="space-y-6">
-      <div><h1 className="text-2xl font-bold">Dashboard</h1><p className="mt-1 inline-flex items-center gap-1 text-sm text-slate-500"><Activity size={15} className="text-emerald-600" /> Live operational overview</p></div>
+      <div className="page-header">
+        <div><h1 className="page-title">Dashboard</h1><p className="page-subtitle inline-flex items-center gap-1.5"><Activity size={15} className="text-emerald-600" /> Live operational overview</p></div>
+        <Link className="btn-primary" to="/events"><CalendarDays size={16} /> Manage events</Link>
+      </div>
       {error && <div className="mt-5"><Alert message={error} /></div>}
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {cards.map(([label, count]) => (
-          <div className="panel" key={label}>
-            <div className="text-sm text-slate-500">{label}</div>
-            <div className="mt-2 text-3xl font-bold">{count}</div>
+        {cards.map(({ label, count, icon: Icon, color }) => (
+          <div className="panel group flex items-start justify-between transition hover:-translate-y-0.5 hover:shadow-md" key={label}>
+            <div><div className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</div><div className="mt-2 text-3xl font-bold tracking-tight">{count.toLocaleString()}</div></div>
+            <span className={`grid h-11 w-11 place-items-center rounded-xl ${color}`}><Icon size={21} /></span>
           </div>
         ))}
       </div>
       <section className="panel">
-        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="font-semibold">Recent event attendance</h2><p className="mt-1 text-xs text-slate-500">Updates automatically when attendance changes.</p></div><Link className="btn-secondary" to="/reports"><BarChart3 size={16} /> Open reports</Link></div>
-        <div className="mt-4 divide-y">
+        <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-base font-semibold">Recent event attendance</h2><p className="mt-1 text-sm text-slate-500">Updates automatically when attendance changes.</p></div><Link className="btn-secondary" to="/reports"><BarChart3 size={16} /> Open reports</Link></div>
+        <div className="mt-5 divide-y divide-slate-200 dark:divide-slate-800">
           {snapshots.map(({ event, summary }) => {
             const rate = summary.expected ? Math.min(100, Math.round((summary.checkedIn / summary.expected) * 100)) : 0
-            return <div className="py-4 first:pt-0 last:pb-0" key={event.id}><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="font-medium">{event.name}</div><div className="text-xs text-slate-500">{formatManilaDate(event.start_at)} · {summary.checkedIn}/{summary.expected} checked in</div></div><div className="flex gap-2"><Link className="btn-secondary" to={`/reports?event=${event.id}`}><BarChart3 size={14} /> Report</Link>{event.status === 'open' && <Link className="btn-primary" to={`/events/${event.id}/scanner`}><ScanLine size={14} /> Scan</Link>}</div></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-blue-600" style={{ width: `${rate}%` }} /></div></div>
+            return <div className="py-5 first:pt-0 last:pb-0" key={event.id}><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="font-semibold">{event.name}</div><div className="mt-1 text-xs text-slate-500">{formatManilaDate(event.start_at)} · {summary.checkedIn.toLocaleString()}/{summary.expected.toLocaleString()} checked in</div></div><div className="flex gap-2"><Link className="btn-secondary" to={`/reports?event=${event.id}`}><BarChart3 size={14} /> Report</Link>{event.status === 'open' && <Link className="btn-primary" to={`/events/${event.id}/scanner`}><ScanLine size={14} /> Scan</Link>}</div></div><div className="mt-3 flex items-center gap-3"><div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"><div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${rate}%` }} /></div><span className="w-9 text-right text-xs font-semibold text-slate-500">{rate}%</span></div></div>
           })}
-          {!snapshots.length && <p className="py-6 text-center text-sm text-slate-500">No events available yet.</p>}
+          {!snapshots.length && <EmptyState compact icon={CalendarX2} title="No events yet" description="Create your first event to start tracking attendance." action={<Link className="btn-primary" to="/events/new"><CalendarDays size={16} /> Create event</Link>} />}
         </div>
       </section>
     </div>

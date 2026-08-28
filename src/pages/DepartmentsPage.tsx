@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { Alert } from '../components/Alert'
+import { useConfirm } from '../components/ConfirmDialog'
+import { EmptyState } from '../components/EmptyState'
 import { LoadingScreen } from '../components/LoadingScreen'
 import { Modal } from '../components/Modal'
 import { SearchInput } from '../components/SearchInput'
@@ -24,6 +26,7 @@ function DepartmentForm({ department, onClose, onSave }: { department: Departmen
 }
 
 export function DepartmentsPage() {
+  const confirm = useConfirm()
   const [departments, setDepartments] = useState<Department[]>([])
   const [students, setStudents] = useState<Student[]>([])
   const [editing, setEditing] = useState<Department | null | undefined>(undefined)
@@ -57,7 +60,7 @@ export function DepartmentsPage() {
     } catch (cause) { setMessage({ text: friendlyError(cause, 'Department could not be saved.'), tone: 'error' }) }
   }
   const remove = async (department: Department) => {
-    if (!window.confirm(`Delete ${department.name}? This is only allowed when it has no current student records.`)) return
+    if (!await confirm({ title: 'Delete department?', message: `${department.name} can only be deleted when it has no current student records.`, confirmLabel: 'Delete department', tone: 'danger' })) return
     try { await softDeleteDepartment(department.id); await load() }
     catch (cause) { setMessage({ text: friendlyError(cause, 'Move or delete current students before deleting this department.'), tone: 'error' }) }
   }
@@ -66,5 +69,5 @@ export function DepartmentsPage() {
     catch (cause) { setMessage({ text: friendlyError(cause), tone: 'error' }) }
   }
   if (loading) return <LoadingScreen />
-  return <div className="space-y-5"><div className="flex items-start justify-between gap-4"><div><h1 className="text-2xl font-bold">Departments</h1><p className="mt-1 text-sm text-slate-500">Manage colleges and event audience codes.</p></div><button className="btn-primary" onClick={() => setEditing(null)}><Plus size={17} /> Add department</button></div>{message && <Alert message={message.text} tone={message.tone} />}<div className="panel flex flex-wrap items-center gap-3 p-4"><SearchInput value={search} onChange={setSearch} placeholder="Search name or code" /><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={showDeleted} onChange={(event) => setShowDeleted(event.target.checked)} /> Show deleted</label></div><div className="table-wrap"><table><thead><tr><th>Code</th><th>Department</th><th>Current Students</th><th>Active Students</th><th>Status</th><th>Actions</th></tr></thead><tbody>{visible.map((department) => <tr key={department.id} className={department.deleted_at ? 'bg-red-50/50 text-slate-500' : ''}><td><span className="inline-flex items-center gap-2 font-mono font-semibold"><Building2 size={16} /> {department.code}</span></td><td>{department.name}</td><td>{counts.get(department.id)?.current ?? 0}</td><td>{counts.get(department.id)?.active ?? 0}</td><td>{department.deleted_at ? 'Deleted' : 'Active'}</td><td><div className="flex gap-2">{department.deleted_at ? <button className="btn-secondary" onClick={() => void restore(department)}><RotateCcw size={14} /> Restore</button> : <><button className="btn-secondary" onClick={() => setEditing(department)}><Pencil size={14} /> Edit</button><button className="btn-danger" onClick={() => void remove(department)}><Trash2 size={14} /></button></>}</div></td></tr>)}{!visible.length && <tr><td colSpan={6} className="py-10 text-center text-slate-500">No departments found.</td></tr>}</tbody></table></div>{editing !== undefined && <DepartmentForm department={editing} onClose={() => setEditing(undefined)} onSave={save} />}</div>
+  return <div className="space-y-5"><div className="page-header"><div><h1 className="page-title">Departments</h1><p className="page-subtitle">Manage colleges and event audience codes.</p></div><button className="btn-primary" onClick={() => setEditing(null)}><Plus size={17} /> Add department</button></div>{message && <Alert message={message.text} tone={message.tone} />}<div className="toolbar"><SearchInput value={search} onChange={setSearch} placeholder="Search name or code" /><label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={showDeleted} onChange={(event) => setShowDeleted(event.target.checked)} /> Show deleted</label></div><div className="table-wrap"><table><thead><tr><th>Code</th><th>Department</th><th>Current Students</th><th>Active Students</th><th>Status</th><th>Actions</th></tr></thead><tbody>{visible.map((department) => <tr key={department.id} className={department.deleted_at ? 'bg-red-50/50 text-slate-500' : ''}><td><span className="inline-flex items-center gap-2 font-mono font-semibold"><Building2 size={16} /> {department.code}</span></td><td>{department.name}</td><td>{counts.get(department.id)?.current ?? 0}</td><td>{counts.get(department.id)?.active ?? 0}</td><td>{department.deleted_at ? 'Deleted' : 'Active'}</td><td><div className="flex gap-2">{department.deleted_at ? <button className="btn-secondary" onClick={() => void restore(department)}><RotateCcw size={14} /> Restore</button> : <><button className="btn-secondary" onClick={() => setEditing(department)}><Pencil size={14} /> Edit</button><button className="btn-danger" onClick={() => void remove(department)} aria-label={`Delete ${department.name}`}><Trash2 size={14} /></button></>}</div></td></tr>)}{!visible.length && <tr><td colSpan={6}><EmptyState compact icon={Building2} title="No departments found" description="Try a different search or add a department." /></td></tr>}</tbody></table></div>{editing !== undefined && <DepartmentForm department={editing} onClose={() => setEditing(undefined)} onSave={save} />}</div>
 }

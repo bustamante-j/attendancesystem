@@ -1,6 +1,6 @@
 # Attendly
 
-Attendly is a reusable QR-based event attendance system for schools and organizations. This repository contains **Iterations 1–4 — Foundation, Core Admin, QR Attendance, and Reporting**: a secure Supabase data/RPC layer, operational admin workflows, a production mobile scanner, and live reporting/export tools.
+Attendly is a reusable QR-based event attendance system for schools and organizations. This repository contains **Iterations 1–5 — Foundation, Core Admin, QR Attendance, Reporting, and Design + UX**: a secure Supabase data/RPC layer, polished operational workflows, a production mobile scanner, and live reporting/export tools.
 
 The starter department is Information Technology (`IT`), and events and students use department relationships so each organization can add its own structure.
 
@@ -32,8 +32,12 @@ The starter department is Information Technology (`IT`), and events and students
 - Audited Super Admin attendance correction and removal interface
 - Explicit officer event-assignment counts, shortcuts, and empty-state guidance
 - Role-based frontend and development-only attendance test panel
+- Responsive SaaS interface with a fixed desktop sidebar, mobile navigation, consistent forms, polished tables, and accessible modal dialogs
+- Persistent light/dark themes with a no-flash initial load and system-theme default
+- Guided loading and empty states plus in-app confirmation dialogs for destructive actions
+- Mobile scanner controls, framing guidance, and immediate scan feedback optimized for one-handed use
 
-Iteration 4 intentionally does not include the final design-system pass, dark mode, or PWA/offline support.
+Iteration 5 intentionally does not include PWA installation or offline support; those remain part of the final deployment iteration.
 
 ## Technology
 
@@ -231,14 +235,14 @@ All important timestamps use `timestamptz`. Attendance timestamps come from Post
 
 The development scan page is guarded by Super Admin authorization and `import.meta.env.DEV`; it is not linked in production builds.
 
-## Known Iteration 4 limitations
+## Known Iteration 5 limitations
 
 - CSV and `.xlsx` student imports are supported; legacy `.xls` files must first be saved as `.xlsx` or CSV
 - Reports export `.xlsx`; PDF report export is not included
 - Attendance history derives eligibility from the student's current department/year because historical profile versions are not stored
-- Core workflows are complete, while the final visual-design and accessibility polish remains scheduled for Iteration 5
-- No PWA, offline mode, or deployment polish
+- The in-app browser was unavailable during Iteration 5, so final cross-device visual acceptance should be completed on real desktop and mobile devices
+- No PWA installation or offline mode yet
 
 ## Roadmap
 
-The next explicitly requested phase should be **Iteration 5 — Design + User Experience**. Iteration 6 remains intentionally untouched.
+The next explicitly requested phase is **Iteration 6 — PWA, performance, final security review, and deployment QA**.

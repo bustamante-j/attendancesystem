@@ -1,5 +1,7 @@
+import { MapPinOff } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { EmptyState } from '../components/EmptyState'
 
 export function NotFoundPage() {
-  return <div className="panel"><h1 className="text-xl font-bold">Page not found</h1><Link className="mt-3 inline-block text-sm text-blue-700 hover:underline" to="/">Return to dashboard</Link></div>
+  return <EmptyState icon={MapPinOff} title="Page not found" description="The page may have moved or the address may be incorrect." action={<Link className="btn-primary" to="/">Return to dashboard</Link>} />
 }

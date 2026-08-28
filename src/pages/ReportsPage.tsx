@@ -1,7 +1,8 @@
-import { BarChart3, Download, History, Pencil, Radio, RefreshCw, Search } from 'lucide-react'
+import { BarChart3, Download, History, Pencil, Radio, RefreshCw, Search, SearchX } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Alert } from '../components/Alert'
+import { EmptyState } from '../components/EmptyState'
 import { LoadingScreen } from '../components/LoadingScreen'
 import { SearchInput } from '../components/SearchInput'
 import { AttendanceEditModal } from '../features/reports/AttendanceEditModal'
@@ -184,8 +185,8 @@ export function ReportsPage() {
 
   return (
     <div className="space-y-5">
-      <header className="flex flex-wrap items-start justify-between gap-4">
-        <div><h1 className="text-2xl font-bold">Reports</h1><p className="mt-1 text-sm text-slate-500">Live event analytics, student history, corrections, and Excel exports.</p></div>
+      <header className="page-header">
+        <div><h1 className="page-title">Reports</h1><p className="page-subtitle">Live event analytics, student history, corrections, and Excel exports.</p></div>
         <div className="flex flex-wrap gap-2">
           <button className="btn-secondary" disabled={!eventId || reportLoading} onClick={() => void refreshReport(true)}><RefreshCw className={reportLoading ? 'animate-spin' : ''} size={16} /> Refresh</button>
           <button className="btn-primary" disabled={!eventRecord || !filteredRows.length || exporting} onClick={() => void exportReport()}><Download size={16} /> {exporting ? 'Exporting…' : 'Export Excel'}</button>
@@ -227,7 +228,7 @@ export function ReportsPage() {
               <thead><tr><th>Student</th><th>Department</th><th>Status</th><th>Check-in</th><th>Check-out</th><th>Actions</th></tr></thead>
               <tbody>
                 {pageRows.map((row) => <tr key={row.student_id}><td><div className="font-medium">{row.full_name}</div><div className="text-xs text-slate-500">{row.student_number} · {row.sex}</div>{!row.is_expected && <div className="mt-1 text-xs text-amber-700">Outside current expected list</div>}</td><td>{row.department_code}<div className="text-xs text-slate-500">Year {row.year_level}</div></td><td><span className={`rounded-full px-2 py-1 text-xs font-medium capitalize ${statusStyle(row.attendance_status)}`}>{row.attendance_status}</span></td><td>{row.check_in_at ? <>{formatManilaDate(row.check_in_at)}<div className="text-xs uppercase text-slate-500">{row.check_in_method}</div></> : '—'}</td><td>{row.check_out_at ? <>{formatManilaDate(row.check_out_at)}<div className="text-xs uppercase text-slate-500">{row.check_out_method}</div></> : '—'}</td><td><div className="flex flex-wrap gap-2"><button className="btn-secondary" onClick={() => setHistoryStudent({ id: row.student_id, student_number: row.student_number, full_name: row.full_name })}><History size={14} /> History</button>{isAdmin && <button className="btn-secondary" onClick={() => setEditingRow(row)}><Pencil size={14} /> Correct</button>}</div></td></tr>)}
-                {!pageRows.length && <tr><td className="py-10 text-center text-slate-500" colSpan={6}>No students match the report filters.</td></tr>}
+                {!pageRows.length && <tr><td colSpan={6}><EmptyState compact icon={SearchX} title="No report rows found" description="Try changing the report filters." /></td></tr>}
               </tbody>
             </table>
           </div>
