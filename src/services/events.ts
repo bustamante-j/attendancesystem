@@ -30,6 +30,17 @@ export async function listEvents() {
   return data as EventRecord[]
 }
 
+export async function getEvent(eventId: string) {
+  const { data, error } = await supabase
+    .from('events')
+    .select(EVENT_COLUMNS)
+    .eq('id', eventId)
+    .is('deleted_at', null)
+    .single()
+  if (error) throw error
+  return data as EventRecord
+}
+
 export async function createEvent(input: EventInput) {
   return invokeFunction<{ eventId: string; pin: string; warning: string }>('create-event', input as unknown as Record<string, unknown>)
 }

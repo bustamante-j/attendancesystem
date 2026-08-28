@@ -65,5 +65,30 @@ export interface AttendanceResult {
     studentNumber: string
     fullName: string
   }
-  attendance?: Record<string, unknown>
+  attendance?: {
+    id?: string
+    checkInAt?: string
+    checkInStatus?: 'present' | 'late'
+    checkOutAt?: string | null
+  }
+}
+
+export interface AttendanceSummary {
+  expected: number
+  checkedIn: number
+  remaining: number
+  present: number
+  late: number
+  checkedOut: number
+}
+
+export interface EventStudentSearchResult {
+  student_id: string
+  student_number: string
+  full_name: string
+  year_level: 1 | 2 | 3 | 4
+  department_code: string
+  check_in_at: string | null
+  check_in_status: 'present' | 'late' | null
+  check_out_at: string | null
 }

@@ -1,7 +1,7 @@
 {
   "name": "attendly",
   "private": true,
-  "version": "0.2.0",
+  "version": "0.3.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -13,15 +13,16 @@
   "dependencies": {
     "@hookform/resolvers": "^5.2.1",
     "@supabase/supabase-js": "^2.57.4",
+    "@zxing/browser": "^0.2.1",
     "date-fns": "^4.1.0",
     "lucide-react": "^0.544.0",
     "papaparse": "^5.5.3",
     "qrcode": "^1.5.4",
-    "read-excel-file": "^9.3.10",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
     "react-hook-form": "^7.62.0",
     "react-router-dom": "^7.9.1",
+    "read-excel-file": "^9.3.10",
     "zod": "^4.1.11"
   },
   "devDependencies": {
