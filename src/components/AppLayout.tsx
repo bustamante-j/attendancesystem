@@ -32,7 +32,7 @@ export function AppLayout() {
       <button className="fixed left-3 top-3 z-30 rounded-md bg-slate-900 p-2 text-white md:hidden" onClick={() => setOpen(!open)}>
         {open ? <X size={20} /> : <Menu size={20} />}
       </button>
-      <aside className={`${open ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 z-20 w-64 bg-slate-900 text-white transition md:static md:translate-x-0`}>
+      <aside className={`${open ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 z-20 h-screen w-64 shrink-0 bg-slate-900 text-white transition md:sticky md:top-0 md:bottom-auto md:translate-x-0`}>
         <div className="border-b border-slate-700 p-5">
           <div className="text-lg font-bold">Attendly</div>
           <div className="mt-1 text-xs text-slate-400">Attendance Management</div>
