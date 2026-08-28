@@ -11,7 +11,7 @@ The starter department is Information Technology (`IT`), and events and students
 - Departments, students, soft deletes, active/inactive students, and profile/session controls
 - Validated CSV/XLSX student import with preview, source-row errors, optional matching-record updates, and database revalidation
 - One-time and atomic batch student QR credential issuance with SHA-256 hashes only in the database
-- QR card rendering, individual PNG downloads, regeneration, and printable batch sheets
+- Branded QR card rendering with the student's name, ID number, sex, department/year, individual PNG downloads, regeneration, and printable batch sheets
 - Department CRUD with protected soft deletion and restoration
 - Searchable/filterable student and user management, deleted-student restoration, profile editing, password reset, disabling, and session revocation
 - Events, department/year audiences, expected-student functions, assignments, statuses, and hashed six-digit PINs
