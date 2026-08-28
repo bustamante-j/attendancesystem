@@ -6,7 +6,6 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
-  ScanLine,
   Users,
   UserRoundCog,
   X,
@@ -15,6 +14,7 @@ import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthProvider'
 import { ThemeToggle } from '../features/theme/ThemeProvider'
+import { BrandLogo } from './BrandLogo'
 
 export function AppLayout() {
   const { profile, signOut } = useAuth()
@@ -61,9 +61,7 @@ export function AppLayout() {
           {open ? <X size={20} /> : <Menu size={20} />}
         </button>
         <div className="flex items-center gap-2.5">
-          <span className="grid h-8 w-8 place-items-center rounded-lg bg-blue-600 text-white shadow-sm shadow-blue-600/30">
-            <ScanLine size={18} />
-          </span>
+          <BrandLogo markOnly className="h-9 w-9" />
           <span className="font-bold tracking-tight text-slate-950 dark:text-white">Attendly</span>
         </div>
         <ThemeToggle compact />
@@ -80,9 +78,7 @@ export function AppLayout() {
 
       <aside className={`${open ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 z-20 flex h-screen w-72 shrink-0 flex-col bg-slate-950 text-white shadow-2xl transition-transform duration-200 md:sticky md:top-0 md:translate-x-0 md:shadow-none`}>
         <div className="flex items-center gap-3 border-b border-white/10 px-6 py-5">
-          <span className="grid h-10 w-10 place-items-center rounded-xl bg-blue-600 shadow-lg shadow-blue-600/25">
-            <ScanLine size={22} />
-          </span>
+          <BrandLogo markOnly className="h-11 w-11" />
           <div>
             <div className="text-lg font-bold tracking-tight">Attendly</div>
             <div className="text-xs text-slate-400">Attendance made simple</div>

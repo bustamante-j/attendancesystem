@@ -4,6 +4,8 @@ import { Link } from 'react-router-dom'
 import { Alert } from '../components/Alert'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingScreen } from '../components/LoadingScreen'
+import { MetricBarChart } from '../components/MetricBarChart'
+import { ViewModeToggle, type ViewMode } from '../components/ViewModeToggle'
 import { useAuth } from '../features/auth/AuthProvider'
 import { friendlyError } from '../lib/errors'
 import { supabase } from '../lib/supabase'
@@ -20,6 +22,7 @@ export function DashboardPage() {
   const [counts, setCounts] = useState<Counts | null>(null)
   const [snapshots, setSnapshots] = useState<EventSnapshot[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('cards')
 
   const load = useCallback(async () => {
     try {
@@ -55,26 +58,30 @@ export function DashboardPage() {
 
   if (!counts && !error) return <LoadingScreen />
   const cards = [
-    { label: 'Active Students', count: counts?.students ?? 0, icon: Users, color: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300' },
-    { label: 'Departments', count: counts?.departments ?? 0, icon: Building2, color: 'bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300' },
-    { label: 'Events', count: counts?.events ?? 0, icon: CalendarDays, color: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300' },
-    ...(profile?.role === 'super_admin' ? [{ label: 'Staff Users', count: counts?.users ?? 0, icon: UserRoundCog, color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' }] : []),
+    { label: 'Active Students', count: counts?.students ?? 0, icon: Users, color: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300', barColor: 'bg-blue-600' },
+    { label: 'Departments', count: counts?.departments ?? 0, icon: Building2, color: 'bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300', barColor: 'bg-violet-500' },
+    { label: 'Events', count: counts?.events ?? 0, icon: CalendarDays, color: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300', barColor: 'bg-amber-500' },
+    ...(profile?.role === 'super_admin' ? [{ label: 'Staff Users', count: counts?.users ?? 0, icon: UserRoundCog, color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300', barColor: 'bg-emerald-500' }] : []),
   ]
   return (
     <div className="space-y-6">
       <div className="page-header">
         <div><h1 className="page-title">Dashboard</h1><p className="page-subtitle inline-flex items-center gap-1.5"><Activity size={15} className="text-emerald-600" /> Live operational overview</p></div>
-        <Link className="btn-primary" to="/events"><CalendarDays size={16} /> Manage events</Link>
+        <div className="flex flex-wrap items-center gap-2"><ViewModeToggle value={viewMode} onChange={setViewMode} label="Dashboard overview view" /><Link className="btn-primary" to="/events"><CalendarDays size={16} /> Manage events</Link></div>
       </div>
       {error && <div className="mt-5"><Alert message={error} /></div>}
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {cards.map(({ label, count, icon: Icon, color }) => (
-          <div className="panel group flex items-start justify-between transition hover:-translate-y-0.5 hover:shadow-md" key={label}>
-            <div><div className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</div><div className="mt-2 text-3xl font-bold tracking-tight">{count.toLocaleString()}</div></div>
-            <span className={`grid h-11 w-11 place-items-center rounded-xl ${color}`}><Icon size={21} /></span>
-          </div>
-        ))}
-      </div>
+      {viewMode === 'cards' ? (
+        <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {cards.map(({ label, count, icon: Icon, color }) => (
+            <div className="panel group flex items-start justify-between transition hover:-translate-y-0.5 hover:shadow-md" key={label}>
+              <div><div className="text-sm font-medium text-slate-500 dark:text-slate-400">{label}</div><div className="mt-2 text-3xl font-bold tracking-tight">{count.toLocaleString()}</div></div>
+              <span className={`grid h-11 w-11 place-items-center rounded-xl ${color}`}><Icon size={21} /></span>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <MetricBarChart title="Workspace totals" description="A visual comparison of the records currently managed by Attendly." items={cards.map(({ label, count, barColor }) => ({ label, value: count, color: barColor }))} />
+      )}
       <section className="panel">
         <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-base font-semibold">Recent event attendance</h2><p className="mt-1 text-sm text-slate-500">Updates automatically when attendance changes.</p></div><Link className="btn-secondary" to="/reports"><BarChart3 size={16} /> Open reports</Link></div>
         <div className="mt-5 divide-y divide-slate-200 dark:divide-slate-800">

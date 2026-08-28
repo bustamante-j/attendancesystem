@@ -49,15 +49,19 @@ export async function createQrCardDataUrl(credential: string, details: QrCardDet
 
   context.textAlign = 'center'
   context.textBaseline = 'middle'
-  context.fillStyle = '#0f172a'
-  context.font = '700 58px Arial, sans-serif'
-  context.fillText('Attendly', 450, 82)
+  const brandImage = await loadImage('/branding/attendly-logo.png').catch(() => null)
+  if (brandImage) context.drawImage(brandImage, 300, 34, 300, 100)
+  else {
+    context.fillStyle = '#0f172a'
+    context.font = '700 58px Arial, sans-serif'
+    context.fillText('Attendly', 450, 82)
+  }
   context.fillStyle = '#64748b'
   context.font = '600 22px Arial, sans-serif'
-  context.fillText('SECURE ATTENDANCE CREDENTIAL', 450, 130)
+  context.fillText('SECURE ATTENDANCE CREDENTIAL', 450, 148)
 
   const qrImage = await loadImage(await createQrDataUrl(credential, 660))
-  context.drawImage(qrImage, 120, 170, 660, 660)
+  context.drawImage(qrImage, 120, 176, 660, 660)
 
   context.fillStyle = '#0f172a'
   drawCenteredText(context, details.fullName.trim(), 884, 790, 46)

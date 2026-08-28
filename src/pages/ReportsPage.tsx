@@ -1,10 +1,11 @@
-import { BarChart3, Download, History, Pencil, Radio, RefreshCw, Search, SearchX } from 'lucide-react'
+import { BarChart3, Download, History, Pencil, PieChart, Radio, RefreshCw, Search, SearchX } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Alert } from '../components/Alert'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingScreen } from '../components/LoadingScreen'
 import { SearchInput } from '../components/SearchInput'
+import { ViewModeToggle, type ViewMode } from '../components/ViewModeToggle'
 import { AttendanceEditModal } from '../features/reports/AttendanceEditModal'
 import { exportAttendanceReport } from '../features/reports/exportReport'
 import { StudentHistoryModal, type StudentHistoryTarget } from '../features/reports/StudentHistoryModal'
@@ -65,6 +66,72 @@ function SummaryChart({ title, rows }: { title: string; rows: GroupSummary[] }) 
   )
 }
 
+function SummaryDetails({ title, rows }: { title: string; rows: GroupSummary[] }) {
+  return (
+    <section className="panel">
+      <h2 className="font-semibold">{title}</h2>
+      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+        {rows.map((row) => (
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60" key={row.label}>
+            <div className="font-semibold">{row.label}</div>
+            <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
+              <div><span className="block text-slate-500">Present</span><strong className="text-emerald-700 dark:text-emerald-300">{row.present}</strong></div>
+              <div><span className="block text-slate-500">Late</span><strong className="text-amber-700 dark:text-amber-300">{row.late}</strong></div>
+              <div><span className="block text-slate-500">Absent</span><strong>{row.absent}</strong></div>
+            </div>
+          </div>
+        ))}
+        {!rows.length && <p className="py-4 text-center text-sm text-slate-500 sm:col-span-2">No summary data.</p>}
+      </div>
+    </section>
+  )
+}
+
+function AttendanceDonut({ expected, present, late, absent, rate, checkedOut, showCheckedOut }: {
+  expected: number
+  present: number
+  late: number
+  absent: number
+  rate: number
+  checkedOut: number
+  showCheckedOut: boolean
+}) {
+  const radius = 52
+  const circumference = 2 * Math.PI * radius
+  const total = Math.max(present + late + absent, 1)
+  const segments = [
+    { label: 'Present', value: present, color: '#10b981', text: 'text-emerald-600 dark:text-emerald-400' },
+    { label: 'Late', value: late, color: '#f59e0b', text: 'text-amber-600 dark:text-amber-400' },
+    { label: 'Absent', value: absent, color: '#94a3b8', text: 'text-slate-500 dark:text-slate-400' },
+  ]
+  let offset = 0
+
+  return (
+    <section className="panel">
+      <div className="flex items-center gap-2"><PieChart size={18} /><h2 className="font-semibold">Attendance overview</h2></div>
+      <div className="mt-4 flex flex-col items-center gap-5 sm:flex-row xl:flex-col">
+        <div className="relative h-48 w-48 shrink-0">
+          <svg className="h-full w-full" viewBox="0 0 128 128" role="img" aria-label={`${rate}% attendance: ${present} present, ${late} late, ${absent} absent`}>
+            <circle cx="64" cy="64" r={radius} fill="none" stroke="currentColor" strokeWidth="14" className="text-slate-100 dark:text-slate-800" />
+            {segments.map((segment) => {
+              const length = (segment.value / total) * circumference
+              const dashOffset = -offset
+              offset += length
+              return <circle key={segment.label} cx="64" cy="64" r={radius} fill="none" stroke={segment.color} strokeWidth="14" strokeDasharray={`${length} ${circumference - length}`} strokeDashoffset={dashOffset} transform="rotate(-90 64 64)" />
+            })}
+          </svg>
+          <div className="absolute inset-0 flex flex-col items-center justify-center"><strong className="text-3xl tracking-tight">{rate}%</strong><span className="text-xs text-slate-500">attendance</span></div>
+        </div>
+        <div className="w-full space-y-2">
+          {segments.map((segment) => <div className="flex items-center justify-between gap-4 text-sm" key={segment.label}><span className={`inline-flex items-center gap-2 font-medium ${segment.text}`}><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: segment.color }} />{segment.label}</span><strong className="tabular-nums">{segment.value.toLocaleString()}</strong></div>)}
+          <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3 text-sm dark:border-slate-700"><span className="text-slate-500">Expected</span><strong>{expected.toLocaleString()}</strong></div>
+          {showCheckedOut && <div className="flex items-center justify-between text-sm"><span className="text-slate-500">Checked out</span><strong>{checkedOut.toLocaleString()}</strong></div>}
+        </div>
+      </div>
+    </section>
+  )
+}
+
 function statusStyle(status: AttendanceReportRow['attendance_status']) {
   if (status === 'present') return 'bg-emerald-100 text-emerald-800'
   if (status === 'late') return 'bg-amber-100 text-amber-800'
@@ -93,6 +160,7 @@ export function ReportsPage() {
   const [reportLoading, setReportLoading] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [message, setMessage] = useState<{ text: string; tone: 'error' | 'success' | 'info' } | null>(null)
 
   useEffect(() => {
@@ -188,6 +256,7 @@ export function ReportsPage() {
       <header className="page-header">
         <div><h1 className="page-title">Reports</h1><p className="page-subtitle">Live event analytics, student history, corrections, and Excel exports.</p></div>
         <div className="flex flex-wrap gap-2">
+          <ViewModeToggle value={viewMode} onChange={setViewMode} label="Report analytics view" />
           <button className="btn-secondary" disabled={!eventId || reportLoading} onClick={() => void refreshReport(true)}><RefreshCw className={reportLoading ? 'animate-spin' : ''} size={16} /> Refresh</button>
           <button className="btn-primary" disabled={!eventRecord || !filteredRows.length || exporting} onClick={() => void exportReport()}><Download size={16} /> {exporting ? 'Exporting…' : 'Export Excel'}</button>
         </div>
@@ -202,11 +271,20 @@ export function ReportsPage() {
 
       {!events.length ? <Alert tone="info" message="No accessible events are available for reporting." /> : reportLoading && !rows.length ? <LoadingScreen label="Building event report…" /> : (
         <>
-          <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-            {[['Expected', summary.expected], ['Present', summary.present], ['Late', summary.late], ['Absent', summary.absent], ['Attendance', `${summary.rate}%`], ...(eventRecord?.attendance_mode === 'check_in_out' ? [['Checked out', summary.checkedOut]] : [])].map(([label, count]) => <div className="panel p-4" key={label}><div className="text-xs font-medium text-slate-500">{label}</div><div className="mt-1 text-2xl font-bold tabular-nums">{count}</div></div>)}
-          </section>
-
-          <div className="grid gap-5 lg:grid-cols-2"><SummaryChart title="Department summary" rows={departmentSummary} /><SummaryChart title="Year-level summary" rows={yearSummary} /></div>
+          {viewMode === 'cards' ? (
+            <>
+              <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
+                {[['Expected', summary.expected], ['Present', summary.present], ['Late', summary.late], ['Absent', summary.absent], ['Attendance', `${summary.rate}%`], ...(eventRecord?.attendance_mode === 'check_in_out' ? [['Checked out', summary.checkedOut]] : [])].map(([label, count]) => <div className="panel p-4" key={label}><div className="text-xs font-medium text-slate-500">{label}</div><div className="mt-1 text-2xl font-bold tabular-nums">{count}</div></div>)}
+              </section>
+              <div className="grid gap-5 lg:grid-cols-2"><SummaryDetails title="Department summary" rows={departmentSummary} /><SummaryDetails title="Year-level summary" rows={yearSummary} /></div>
+            </>
+          ) : (
+            <div className="grid gap-5 xl:grid-cols-3">
+              <AttendanceDonut {...summary} showCheckedOut={eventRecord?.attendance_mode === 'check_in_out'} />
+              <SummaryChart title="Department summary" rows={departmentSummary} />
+              <SummaryChart title="Year-level summary" rows={yearSummary} />
+            </div>
+          )}
 
           <section className="panel">
             <div className="flex items-center gap-2"><History size={18} /><h2 className="font-semibold">Student attendance history</h2></div>

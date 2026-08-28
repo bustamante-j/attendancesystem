@@ -1,10 +1,11 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { Eye, EyeOff, LogIn, ScanLine, ShieldCheck, Sparkles } from 'lucide-react'
+import { Eye, EyeOff, LogIn, ShieldCheck, Sparkles } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Navigate } from 'react-router-dom'
 import { z } from 'zod'
 import { Alert } from '../components/Alert'
+import { BrandLogo } from '../components/BrandLogo'
 import { useAuth } from '../features/auth/AuthProvider'
 import { ThemeToggle } from '../features/theme/ThemeProvider'
 import { friendlyError } from '../lib/errors'
@@ -41,7 +42,7 @@ export function LoginPage() {
       <section className="relative hidden overflow-hidden bg-slate-950 p-12 text-white lg:flex lg:flex-col lg:justify-between">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(37,99,235,0.3),transparent_32%),radial-gradient(circle_at_85%_85%,rgba(79,70,229,0.22),transparent_30%)]" />
         <div className="relative flex items-center gap-3">
-          <span className="grid h-11 w-11 place-items-center rounded-xl bg-blue-600 shadow-xl shadow-blue-600/30"><ScanLine size={24} /></span>
+          <BrandLogo markOnly className="h-12 w-12" />
           <span className="text-xl font-bold tracking-tight">Attendly</span>
         </div>
         <div className="relative max-w-xl">
@@ -56,10 +57,7 @@ export function LoginPage() {
 
       <section className="relative flex items-center justify-center p-4 py-20 sm:p-8">
         <div className="w-full max-w-md">
-          <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <span className="grid h-10 w-10 place-items-center rounded-xl bg-blue-600 text-white shadow-lg shadow-blue-600/25"><ScanLine size={22} /></span>
-            <div><div className="text-lg font-bold tracking-tight">Attendly</div><div className="text-xs text-slate-500">Attendance made simple</div></div>
-          </div>
+          <div className="mb-8 lg:hidden"><BrandLogo className="h-12 w-auto max-w-44" /></div>
           <div className="rounded-2xl border border-slate-200/80 bg-white p-6 shadow-xl shadow-slate-200/50 sm:p-8 dark:border-slate-800 dark:bg-slate-900 dark:shadow-black/20">
             <div className="mb-7">
               <h2 className="text-2xl font-bold tracking-tight text-slate-950 dark:text-white">Welcome back</h2>

@@ -36,6 +36,8 @@ The starter department is Information Technology (`IT`), and events and students
 - Persistent light/dark themes with a no-flash initial load and system-theme default
 - Guided loading and empty states plus in-app confirmation dialogs for destructive actions
 - Mobile scanner controls, framing guidance, and immediate scan feedback optimized for one-handed use
+- Attendly logo branding across navigation, sign-in, and downloadable student QR cards
+- Switchable card and graph views for dashboard totals and report analytics
 
 Iteration 5 intentionally does not include PWA installation or offline support; those remain part of the final deployment iteration.
 
