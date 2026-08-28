@@ -1,7 +1,7 @@
 {
   "name": "attendly",
   "private": true,
-  "version": "0.3.0",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -23,6 +23,7 @@
     "react-hook-form": "^7.62.0",
     "react-router-dom": "^7.9.1",
     "read-excel-file": "^9.3.10",
+    "write-excel-file": "^4.1.1",
     "zod": "^4.1.11"
   },
   "devDependencies": {

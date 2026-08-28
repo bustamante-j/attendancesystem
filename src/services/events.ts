@@ -119,6 +119,14 @@ export async function listEventAssignments(eventId: string) {
   return data as unknown as EventAssignment[]
 }
 
+export async function listEventAssignmentCounts() {
+  const { data, error } = await supabase.from('event_assignments').select('user_id')
+  if (error) throw error
+  const counts: Record<string, number> = {}
+  for (const row of data) counts[row.user_id] = (counts[row.user_id] ?? 0) + 1
+  return counts
+}
+
 export async function assignUser(eventId: string, userId: string, assignedBy: string) {
   const { error } = await supabase.from('event_assignments').insert({
     event_id: eventId,

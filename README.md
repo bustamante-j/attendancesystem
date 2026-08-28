@@ -1,6 +1,6 @@
 # Attendly
 
-Attendly is a reusable QR-based event attendance system for schools and organizations. This repository contains **Iterations 1–3 — Foundation, Core Admin, and QR Attendance**: a secure Supabase data/RPC layer, operational admin workflows, and a production mobile scanner.
+Attendly is a reusable QR-based event attendance system for schools and organizations. This repository contains **Iterations 1–4 — Foundation, Core Admin, QR Attendance, and Reporting**: a secure Supabase data/RPC layer, operational admin workflows, a production mobile scanner, and live reporting/export tools.
 
 The starter department is Information Technology (`IT`), and events and students use department relationships so each organization can add its own structure.
 
@@ -19,22 +19,27 @@ The starter department is Information Technology (`IT`), and events and students
 - Atomic QR/manual attendance RPCs with database time, eligibility/window checks, late calculation, check-out updates, and duplicate-race handling
 - Super Admin attendance-correction RPC and administrative audit infrastructure
 - RLS on every application table and restricted table/column grants
-- Super Admin bootstrap script and five privileged Edge Functions
+- Super Admin bootstrap script and seven privileged Edge Functions
 - Improved event CRUD, schedule validation, audience summaries, secure PIN lifecycle, status controls, and scanner assignments
 - Mobile phone-camera QR scanning with environment-camera preference and a dedicated scan frame
 - Event PIN gate, check-in/check-out direction, three-second repeat cooldown, and serial scan processing
 - Clear visual results plus optional sound and vibration feedback
 - Realtime attendance counters with a polling fallback and recent session activity
 - Eligible-student manual attendance search using the same secure attendance rules
+- Realtime operational dashboard and event attendance reports
+- Department/year-level charts, absent lists, student attendance history, and report filtering
+- True `.xlsx` exports with attendance, summary, and absent-list worksheets
+- Audited Super Admin attendance correction and removal interface
+- Explicit officer event-assignment counts, shortcuts, and empty-state guidance
 - Role-based frontend and development-only attendance test panel
 
-Iteration 3 intentionally does not include attendance exports/reports, analytics charts, a final design system, or PWA/offline support.
+Iteration 4 intentionally does not include the final design-system pass, dark mode, or PWA/offline support.
 
 ## Technology
 
 - React, TypeScript, Vite, React Router, and Tailwind CSS
 - React Hook Form and Zod
-- Papa Parse, read-excel-file, QRCode, and ZXing Browser for import, rendering, and camera scanning
+- Papa Parse, read-excel-file, write-excel-file, QRCode, and ZXing Browser for import, real XLSX export, rendering, and camera scanning
 - Supabase Auth, PostgreSQL, Row Level Security, RPC functions, Edge Functions, and CLI migrations
 - PostgreSQL `pgcrypto` for event PIN hashing
 
@@ -187,6 +192,12 @@ Migration `202608280004_iteration_3_scanner.sql` adds:
 - authorized eligible-student search for manual attendance
 - the attendance table in the Supabase Realtime publication
 
+Migration `202608280005_iteration_4_reporting.sql` adds:
+
+- secure event attendance report and student history RPCs for Super Admin and authorized faculty
+- expected/attended student reconciliation that preserves historical attendance rows
+- audited Super Admin attendance removal for correcting an erroneous record back to absent
+
 All important timestamps use `timestamptz`. Attendance timestamps come from PostgreSQL `now()` and never from the scanner client. Absence is derived from expected students minus attendance rows. Check-out updates the original attendance row. Critical historical foreign keys use `ON DELETE RESTRICT`, and normal student/event/department deletion is soft deletion.
 
 ## Security model
@@ -215,17 +226,19 @@ All important timestamps use `timestamptz`. Attendance timestamps come from Post
 7. Allow camera permission and scan a student's Attendly QR card, or use manual attendance search when a card cannot be scanned.
 8. Repeat to confirm `already_checked_in`. If the late threshold has passed, the first result is `success_late`; otherwise it is `success_present`.
 9. For a `check_in_out` event whose checkout window is open, select `check_out` to verify the existing row is updated and a repeat returns `already_checked_out`.
+10. Open **Reports**, select the event, filter its attendance table, inspect department/year summaries, and export the three-sheet Excel workbook.
+11. As Super Admin, use **Correct** to edit a check-in or remove an erroneous record. Confirm the report updates automatically.
 
 The development scan page is guarded by Super Admin authorization and `import.meta.env.DEV`; it is not linked in production builds.
 
-## Known Iteration 3 limitations
+## Known Iteration 4 limitations
 
-- No attendance Excel export or reporting dashboards
-- No analytics reports or charts; scanner counters are Realtime
 - CSV and `.xlsx` student imports are supported; legacy `.xls` files must first be saved as `.xlsx` or CSV
-- Core admin UI is complete, while final visual-design polish remains scheduled for Iteration 5
+- Reports export `.xlsx`; PDF report export is not included
+- Attendance history derives eligibility from the student's current department/year because historical profile versions are not stored
+- Core workflows are complete, while the final visual-design and accessibility polish remains scheduled for Iteration 5
 - No PWA, offline mode, or deployment polish
 
 ## Roadmap
 
-The next explicitly requested phase should be **Iteration 4 — Reports + Export**. Iterations 5–6 remain intentionally untouched.
+The next explicitly requested phase should be **Iteration 5 — Design + User Experience**. Iteration 6 remains intentionally untouched.

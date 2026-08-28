@@ -71,3 +71,11 @@ export function subscribeToEventAttendance(eventId: string, onChange: () => void
     .subscribe()
   return () => { void supabase.removeChannel(channel) }
 }
+
+export function subscribeToAttendance(onChange: () => void) {
+  const channel = supabase
+    .channel('attendance:dashboard')
+    .on('postgres_changes', { event: '*', schema: 'public', table: 'attendance' }, onChange)
+    .subscribe()
+  return () => { void supabase.removeChannel(channel) }
+}

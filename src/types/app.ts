@@ -92,3 +92,34 @@ export interface EventStudentSearchResult {
   check_in_status: 'present' | 'late' | null
   check_out_at: string | null
 }
+
+export type AttendanceReportStatus = 'present' | 'late' | 'absent'
+
+export interface AttendanceReportRow {
+  student_id: string
+  student_number: string
+  full_name: string
+  sex: Sex
+  year_level: 1 | 2 | 3 | 4
+  department_id: string
+  department_name: string
+  department_code: string
+  is_expected: boolean
+  attendance_status: AttendanceReportStatus
+  check_in_at: string | null
+  check_in_method: 'qr' | 'manual' | null
+  check_out_at: string | null
+  check_out_method: 'qr' | 'manual' | null
+}
+
+export interface StudentAttendanceHistoryRow {
+  event_id: string
+  event_name: string
+  event_start_at: string
+  event_status: EventStatus
+  attendance_status: AttendanceReportStatus
+  check_in_at: string | null
+  check_in_method: 'qr' | 'manual' | null
+  check_out_at: string | null
+  check_out_method: 'qr' | 'manual' | null
+}

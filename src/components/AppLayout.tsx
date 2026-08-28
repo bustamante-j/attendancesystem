@@ -1,4 +1,4 @@
-import { Building2, CalendarDays, Code2, LayoutDashboard, LogOut, Menu, Users, UserRoundCog, X } from 'lucide-react'
+import { BarChart3, Building2, CalendarDays, Code2, LayoutDashboard, LogOut, Menu, Users, UserRoundCog, X } from 'lucide-react'
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthProvider'
@@ -14,6 +14,7 @@ export function AppLayout() {
         { to: '/students', label: 'Students', icon: Users },
         { to: '/departments', label: 'Departments', icon: Building2 },
         { to: '/events', label: 'Events', icon: CalendarDays },
+        { to: '/reports', label: 'Reports', icon: BarChart3 },
         { to: '/users', label: 'Users', icon: UserRoundCog },
         ...(import.meta.env.DEV ? [{ to: '/dev', label: 'Dev Tools', icon: Code2 }] : []),
       ]
@@ -22,6 +23,7 @@ export function AppLayout() {
           { to: '/', label: 'Dashboard', icon: LayoutDashboard },
           { to: '/students', label: 'Students', icon: Users },
           { to: '/events', label: 'Events', icon: CalendarDays },
+          { to: '/reports', label: 'Reports', icon: BarChart3 },
         ]
       : [{ to: '/events', label: 'Assigned Events', icon: CalendarDays }]
 
