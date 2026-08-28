@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { LogIn } from 'lucide-react'
+import { Eye, EyeOff, LogIn } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Navigate } from 'react-router-dom'
@@ -18,6 +18,7 @@ type LoginValues = z.infer<typeof schema>
 export function LoginPage() {
   const { session, profile, signIn } = useAuth()
   const [error, setError] = useState<string | null>(null)
+  const [showPassword, setShowPassword] = useState(false)
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<LoginValues>({
     resolver: zodResolver(schema),
   })
@@ -47,11 +48,22 @@ export function LoginPage() {
             <input className="field" autoComplete="username" {...register('username')} />
             {errors.username && <span className="mt-1 block text-xs text-red-700">{errors.username.message}</span>}
           </label>
-          <label className="block">
-            <span className="label">Password</span>
-            <input className="field" type="password" autoComplete="current-password" {...register('password')} />
+          <div>
+            <label className="label" htmlFor="login-password">Password</label>
+            <div className="relative">
+              <input id="login-password" className="field pr-11" type={showPassword ? 'text' : 'password'} autoComplete="current-password" {...register('password')} />
+              <button
+                type="button"
+                className="absolute inset-y-0 right-0 flex w-11 items-center justify-center text-slate-500 hover:text-slate-800"
+                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-pressed={showPassword}
+                onClick={() => setShowPassword((visible) => !visible)}
+              >
+                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+              </button>
+            </div>
             {errors.password && <span className="mt-1 block text-xs text-red-700">{errors.password.message}</span>}
-          </label>
+          </div>
           <button className="btn-primary w-full" disabled={isSubmitting || !!environmentError}>
             <LogIn size={17} /> {isSubmitting ? 'Signing in…' : 'Sign in'}
           </button>
