@@ -26,7 +26,7 @@ Deno.serve(async (request) => {
     if (new Set(studentIds).size !== studentIds.length) throw new Error('The student selection contains duplicates.')
 
     const credentials = await Promise.all(studentIds.map(async (studentId: string) => {
-      const credential = `KCP_${base64Url(crypto.getRandomValues(new Uint8Array(32)))}`
+      const credential = `ATTENDLY_${base64Url(crypto.getRandomValues(new Uint8Array(32)))}`
       return {
         student_id: studentId,
         credential,

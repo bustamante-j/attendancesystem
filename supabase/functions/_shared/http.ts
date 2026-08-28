@@ -76,7 +76,7 @@ export function normalizeUsername(value: unknown) {
 }
 
 export function usernameToInternalEmail(username: string) {
-  return `${username}@attendance.kcp.local`
+  return `${username}@auth.attendly.local`
 }
 
 export function requireNonBlank(value: unknown, label: string, maximum = 200) {

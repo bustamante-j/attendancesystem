@@ -33,7 +33,7 @@ try {
     auth: { persistSession: false, autoRefreshToken: false },
   })
   const { data: created, error: authError } = await admin.auth.admin.createUser({
-    email: `${username}@attendance.kcp.local`,
+    email: `${username}@auth.attendly.local`,
     password,
     email_confirm: true,
     user_metadata: { display_name: fullName },

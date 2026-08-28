@@ -127,7 +127,7 @@ export function downloadStudentImportTemplate() {
   const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' }))
   const anchor = document.createElement('a')
   anchor.href = url
-  anchor.download = 'kcp-student-import-template.csv'
+  anchor.download = 'attendly-student-import-template.csv'
   anchor.click()
   URL.revokeObjectURL(url)
 }

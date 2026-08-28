@@ -426,7 +426,7 @@ create trigger event_assignments_audit after insert or delete on public.event_as
 for each row execute function public.audit_assignment_change();
 
 insert into public.departments (name, code)
-values ('College of Information Technology', 'CIT')
+values ('Information Technology', 'IT')
 on conflict do nothing;
 
 alter table public.profiles enable row level security;

@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import type { Profile } from '../../types/app'
 import { usernameToInternalEmail } from '../../utils/auth'
 
-const SESSION_STARTED_KEY = 'kcp_attendance_session_started_at'
+const SESSION_STARTED_KEY = 'attendly_session_started_at'
 const MAX_SESSION_MS = 12 * 60 * 60 * 1000
 
 interface AuthContextValue {

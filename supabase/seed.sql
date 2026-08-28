@@ -1,3 +1,3 @@
 insert into public.departments (name, code)
-values ('College of Information Technology', 'CIT')
+values ('Information Technology', 'IT')
 on conflict do nothing;

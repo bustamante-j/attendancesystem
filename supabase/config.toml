@@ -1,4 +1,4 @@
-project_id = "kcp-attendance"
+project_id = "attendlysystem"
 
 [api]
 enabled = true

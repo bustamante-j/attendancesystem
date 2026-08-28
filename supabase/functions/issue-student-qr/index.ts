@@ -22,7 +22,7 @@ Deno.serve(async (request) => {
     if (!/^[0-9a-f-]{36}$/i.test(studentId)) throw new Error('A valid student is required.')
 
     const randomBytes = crypto.getRandomValues(new Uint8Array(32))
-    const credential = `KCP_${base64Url(randomBytes)}`
+    const credential = `ATTENDLY_${base64Url(randomBytes)}`
     const tokenHash = await sha256Hex(credential)
     const { data: credentialId, error } = await admin.rpc('issue_student_qr_secure', {
       p_actor_id: actor.id,

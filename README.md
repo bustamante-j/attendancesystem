@@ -1,8 +1,8 @@
-# KCP Attendance
+# Attendly
 
-KCP Attendance is a QR-based event attendance system for King's College of the Philippines. This repository contains **Iterations 1 and 2 — Foundation, Backend, and Core Admin Functionality**: a secure Supabase data/RPC layer and the operational admin workflows built on it.
+Attendly is a reusable QR-based event attendance system for schools and organizations. This repository contains **Iterations 1 and 2 — Foundation, Backend, and Core Admin Functionality**: a secure Supabase data/RPC layer and the operational admin workflows built on it.
 
-The first department is the College of Information Technology (`CIT`), but events and students use department relationships so additional colleges can be added later.
+The starter department is Information Technology (`IT`), and events and students use department relationships so each organization can add its own structure.
 
 ## Implemented scope
 
@@ -88,7 +88,7 @@ npx supabase functions deploy batch-issue-student-qrs --use-api
 npx supabase functions deploy update-user --use-api
 ```
 
-`supabase/config.toml` disables public signup for CLI-managed configuration. Confirm in the hosted project's Auth settings that public user signup is disabled before production use. Do not create tables manually in the dashboard; `supabase db push` applies the versioned migrations and seeds `CIT`.
+`supabase/config.toml` disables public signup for CLI-managed configuration. Confirm in the hosted project's Auth settings that public user signup is disabled before production use. Do not create tables manually in the dashboard; `supabase db push` applies the versioned migrations and seeds `IT`.
 
 The Edge Function environment automatically receives `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` from Supabase. Do not add the service-role key to frontend environment variables.
 
@@ -112,7 +112,7 @@ Remove-Item Env:SUPABASE_SERVICE_ROLE_KEY
 The script prompts for username, full name, and a password of 12–128 characters. Non-interactive username/full-name values are also accepted:
 
 ```powershell
-npm run bootstrap:admin -- --username admin --full-name "KCP Administrator"
+npm run bootstrap:admin -- --username admin --full-name "Attendly Administrator"
 ```
 
 No credentials are hard-coded. The script creates the Supabase Auth user, creates the `super_admin` profile, writes a safe audit entry, and deletes the Auth user again if profile creation fails.
@@ -123,7 +123,7 @@ Users only see a username field. The same normalization is used by the frontend,
 
 1. Trim and lowercase the username.
 2. Allow 3–40 letters, numbers, underscores, or dots.
-3. Map it internally to `username@attendance.kcp.local`.
+3. Map it internally to `username@auth.attendly.local`.
 4. Call Supabase Auth email/password sign-in.
 
 The internal email is not stored in `profiles` and is never displayed in the normal UI. Public signup is disabled; Super Admin creates staff accounts through the `create-user` Edge Function.
@@ -132,7 +132,7 @@ Application sessions have a 12-hour frontend maximum. Disabled accounts and sess
 
 ## QR credential security
 
-`issue-student-qr` and `batch-issue-student-qrs` create 256 bits of cryptographically secure randomness per credential and prepend `KCP_`. They return raw credentials to the authorized Super Admin once. The browser renders temporary QR cards for immediate PNG download or printing.
+`issue-student-qr` and `batch-issue-student-qrs` create 256 bits of cryptographically secure randomness per credential and prepend `ATTENDLY_`. They return raw credentials to the authorized Super Admin once. The browser renders temporary QR cards for immediate PNG download or printing.
 
 Before storage, the function computes SHA-256 and calls a service-role-only transactional RPC. PostgreSQL locks issuance for each student, revokes any active credential, stores only the hash and a non-secret prefix, and enforces one active credential per student with a partial unique index. Batch operations are all-or-nothing and accept at most 500 students. A scanner later hashes the received raw value and compares hashes inside the protected attendance RPC. Names, student numbers, and other personal data are never encoded in the credential.
 
@@ -197,9 +197,9 @@ All important timestamps use `timestamptz`. Attendance timestamps come from Post
 
 1. Apply migrations and deploy all functions.
 2. Bootstrap an admin, start the frontend, and sign in with its username/password.
-3. In **Students**, create an active CIT student or download the CSV template and import a student batch. Correct any source-row validation errors shown in the preview.
+3. In **Students**, create an active IT student or download the CSV template and import a student batch. Correct any source-row validation errors shown in the preview.
 4. Select one or more students and issue QR credentials. Download individual PNGs or print the batch sheet before closing the one-time result.
-5. In **Events**, create an event targeting CIT. Set its check-in window around the current Manila time, save the one-time PIN, assign an officer, and click **Open**.
+5. In **Events**, create an event targeting IT. Set its check-in window around the current Manila time, save the one-time PIN, assign an officer, and click **Open**.
 6. In development, open **Dev Tools**, choose the event, paste a raw credential captured at issuance, select `check_in`, and process the test scan.
 7. Repeat to confirm `already_checked_in`. If the late threshold has passed, the first result is `success_late`; otherwise it is `success_present`.
 8. For a `check_in_out` event whose checkout window is open, select `check_out` to verify the existing row is updated and a repeat returns `already_checked_out`.

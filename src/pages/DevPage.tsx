@@ -50,7 +50,7 @@ export function DevPage() {
       <div className="panel">
         <h2 className="font-semibold">Attendance RPC test</h2>
         <p className="mt-1 text-sm text-slate-500">Paste the one-time raw credential shown after issuing a student's QR credential.</p>
-        <div className="mt-3 grid gap-3 md:grid-cols-[1fr_180px_auto]"><input className="field" placeholder="KCP_… credential" value={credential} onChange={(event) => setCredential(event.target.value)} /><select className="field" value={direction} onChange={(event) => setDirection(event.target.value as 'check_in' | 'check_out')}><option value="check_in">Check in</option><option value="check_out">Check out</option></select><button className="btn-primary" onClick={() => void scan()}>Process test scan</button></div>
+        <div className="mt-3 grid gap-3 md:grid-cols-[1fr_180px_auto]"><input className="field" placeholder="ATTENDLY_… credential" value={credential} onChange={(event) => setCredential(event.target.value)} /><select className="field" value={direction} onChange={(event) => setDirection(event.target.value as 'check_in' | 'check_out')}><option value="check_in">Check in</option><option value="check_out">Check out</option></select><button className="btn-primary" onClick={() => void scan()}>Process test scan</button></div>
       </div>
       {result !== null && <div className="panel"><h2 className="font-semibold">RPC result</h2><pre className="mt-3 overflow-auto rounded bg-slate-950 p-4 text-xs text-slate-100">{JSON.stringify(result, null, 2)}</pre></div>}
     </div>

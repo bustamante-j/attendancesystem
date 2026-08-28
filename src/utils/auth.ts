@@ -9,5 +9,5 @@ export function normalizeUsername(username: string) {
 }
 
 export function usernameToInternalEmail(username: string) {
-  return `${normalizeUsername(username)}@attendance.kcp.local`
+  return `${normalizeUsername(username)}@auth.attendly.local`
 }

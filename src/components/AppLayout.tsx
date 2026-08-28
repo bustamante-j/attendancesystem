@@ -32,8 +32,8 @@ export function AppLayout() {
       </button>
       <aside className={`${open ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 z-20 w-64 bg-slate-900 text-white transition md:static md:translate-x-0`}>
         <div className="border-b border-slate-700 p-5">
-          <div className="text-lg font-bold">KCP Attendance</div>
-          <div className="mt-1 text-xs text-slate-400">King's College of the Philippines</div>
+          <div className="text-lg font-bold">Attendly</div>
+          <div className="mt-1 text-xs text-slate-400">Attendance Management</div>
         </div>
         <nav className="space-y-1 p-3">
           {links.map(({ to, label, icon: Icon }) => (
