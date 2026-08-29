@@ -45,3 +45,6 @@ verify_jwt = true
 
 [functions.view-student-qr]
 verify_jwt = true
+
+[functions.view-event-pin]
+verify_jwt = true

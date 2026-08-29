@@ -1,6 +1,6 @@
 import { corsHeaders, errorResponse, jsonResponse, normalizeUsername, requireActor, requireNonBlank, usernameToInternalEmail } from '../_shared/http.ts'
 
-const roles = ['super_admin', 'faculty', 'officer'] as const
+const roles = ['super_admin', 'admin', 'faculty', 'officer'] as const
 
 Deno.serve(async (request) => {
   if (request.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders })

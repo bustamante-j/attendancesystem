@@ -24,8 +24,9 @@ export interface ActorContext {
     id: string
     username: string
     full_name: string
-    role: 'super_admin' | 'faculty' | 'officer'
+    role: 'super_admin' | 'admin' | 'faculty' | 'officer'
     is_enabled: boolean
+    session_revoked_at: string | null
   }
   admin: SupabaseClient
 }
@@ -51,10 +52,13 @@ export async function requireActor(
 
   const { data: profile, error: profileError } = await userClient
     .from('profiles')
-    .select('id,username,full_name,role,is_enabled')
+    .select('id,username,full_name,role,is_enabled,session_revoked_at')
     .eq('id', userData.user.id)
     .single()
   if (profileError || !profile || !profile.is_enabled) throw new Error('Your account is disabled or unavailable.')
+  const signedInAt = userData.user.last_sign_in_at ? new Date(userData.user.last_sign_in_at).getTime() : 0
+  const revokedAt = profile.session_revoked_at ? new Date(profile.session_revoked_at).getTime() : 0
+  if (revokedAt && revokedAt >= signedInAt) throw new Error('Your session has been revoked. Sign in again.')
   if (!allowedRoles.includes(profile.role)) throw new Error('You are not authorized for this action.')
 
   return {

@@ -37,7 +37,7 @@ interface RecentScan {
 }
 
 function resultTone(code: string): ScanFeedbackTone {
-  if (code === 'success_present' || code === 'success_checkout') return 'success'
+  if (code === 'success_present' || code === 'success_checkout' || code === 'undo_success') return 'success'
   if (code === 'success_late' || code.startsWith('already_')) return 'warning'
   return 'error'
 }
@@ -72,11 +72,14 @@ export function ScannerPage() {
   const [loading, setLoading] = useState(true)
   const processingRef = useRef(false)
   const lastCredentialRef = useRef<{ value: string; scannedAt: number } | null>(null)
+  const summaryRefreshInFlightRef = useRef(false)
 
   const refreshSummary = useCallback(async () => {
-    if (!eventId) return
+    if (!eventId || summaryRefreshInFlightRef.current) return
+    summaryRefreshInFlightRef.current = true
     try { setSummary(await getAttendanceSummary(eventId)) }
     catch (cause) { setError(friendlyError(cause, 'Live attendance counts could not be refreshed.')) }
+    finally { summaryRefreshInFlightRef.current = false }
   }, [eventId])
 
   useEffect(() => {
@@ -106,9 +109,23 @@ export function ScannerPage() {
 
   useEffect(() => {
     if (!eventId || !eventRecord || !hasAccess) return
-    const unsubscribe = subscribeToEventAttendance(eventId, () => { void refreshSummary() })
-    const interval = window.setInterval(() => { void refreshSummary() }, 15_000)
-    return () => { unsubscribe(); window.clearInterval(interval) }
+    let refreshTimer: number | undefined
+    const scheduleRefresh = (delay = 300) => {
+      window.clearTimeout(refreshTimer)
+      refreshTimer = window.setTimeout(() => {
+        if (!document.hidden) void refreshSummary()
+      }, delay)
+    }
+    const unsubscribe = subscribeToEventAttendance(eventId, () => scheduleRefresh())
+    const interval = window.setInterval(() => scheduleRefresh(0), 30_000)
+    const onVisibilityChange = () => { if (!document.hidden) scheduleRefresh(0) }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      unsubscribe()
+      window.clearInterval(interval)
+      window.clearTimeout(refreshTimer)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
   }, [eventId, eventRecord, hasAccess, refreshSummary])
 
   useEffect(() => {
@@ -261,8 +278,8 @@ export function ScannerPage() {
                 <p className="text-xs text-slate-500">The database validates the selected event window.</p>
               </div>
               <div className="inline-flex w-full rounded-xl border border-slate-300 bg-slate-100 p-1 sm:w-auto dark:border-slate-700 dark:bg-slate-800">
-                <button className={`min-h-10 flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${direction === 'check_in' ? 'bg-white text-blue-800 shadow-sm dark:bg-slate-950 dark:text-blue-300' : 'text-slate-600 dark:text-slate-400'}`} onClick={() => setDirection('check_in')}>Check in</button>
-                {eventRecord.attendance_mode === 'check_in_out' && <button className={`min-h-10 flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${direction === 'check_out' ? 'bg-white text-blue-800 shadow-sm dark:bg-slate-950 dark:text-blue-300' : 'text-slate-600 dark:text-slate-400'}`} onClick={() => setDirection('check_out')}>Check out</button>}
+                <button aria-pressed={direction === 'check_in'} className={`min-h-10 flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${direction === 'check_in' ? 'bg-white text-blue-800 shadow-sm dark:bg-slate-950 dark:text-blue-300' : 'text-slate-600 dark:text-slate-400'}`} onClick={() => setDirection('check_in')}>Check in</button>
+                {eventRecord.attendance_mode === 'check_in_out' && <button aria-pressed={direction === 'check_out'} className={`min-h-10 flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${direction === 'check_out' ? 'bg-white text-blue-800 shadow-sm dark:bg-slate-950 dark:text-blue-300' : 'text-slate-600 dark:text-slate-400'}`} onClick={() => setDirection('check_out')}>Check out</button>}
               </div>
             </div>
           </section>

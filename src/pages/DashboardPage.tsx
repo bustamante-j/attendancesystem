@@ -1,10 +1,9 @@
 import { Activity, BarChart3, Building2, CalendarDays, CalendarX2, ScanLine, Users, UserRoundCog } from 'lucide-react'
-import { useCallback, useEffect, useState } from 'react'
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Alert } from '../components/Alert'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingScreen } from '../components/LoadingScreen'
-import { MetricBarChart } from '../components/MetricBarChart'
 import { ViewModeToggle, type ViewMode } from '../components/ViewModeToggle'
 import { useAuth } from '../features/auth/AuthProvider'
 import { friendlyError } from '../lib/errors'
@@ -13,6 +12,8 @@ import { getAttendanceSummary, subscribeToAttendance } from '../services/attenda
 import { listEvents } from '../services/events'
 import type { AttendanceSummary, EventRecord } from '../types/app'
 import { formatManilaDate } from '../utils/dates'
+
+const DashboardCharts = lazy(() => import('../components/DashboardCharts').then((module) => ({ default: module.DashboardCharts })))
 
 interface Counts { students: number; departments: number; events: number; users: number }
 interface EventSnapshot { event: EventRecord; summary: AttendanceSummary }
@@ -23,8 +24,11 @@ export function DashboardPage() {
   const [snapshots, setSnapshots] = useState<EventSnapshot[]>([])
   const [error, setError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
+  const loadInFlightRef = useRef(false)
 
   const load = useCallback(async () => {
+    if (loadInFlightRef.current) return
+    loadInFlightRef.current = true
     try {
       const [queries, eventRows] = await Promise.all([
         Promise.all([
@@ -46,14 +50,30 @@ export function DashboardPage() {
       setError(null)
     } catch (cause) {
       setError(friendlyError(cause))
+    } finally {
+      loadInFlightRef.current = false
     }
   }, [profile?.role])
 
   useEffect(() => {
-    void load()
-    const unsubscribe = subscribeToAttendance(() => { void load() })
-    const interval = window.setInterval(() => { void load() }, 15_000)
-    return () => { unsubscribe(); window.clearInterval(interval) }
+    let refreshTimer: number | undefined
+    const scheduleRefresh = (delay = 500) => {
+      window.clearTimeout(refreshTimer)
+      refreshTimer = window.setTimeout(() => {
+        if (!document.hidden) void load()
+      }, delay)
+    }
+    scheduleRefresh(0)
+    const unsubscribe = subscribeToAttendance(() => scheduleRefresh())
+    const interval = window.setInterval(() => scheduleRefresh(0), 60_000)
+    const onVisibilityChange = () => { if (!document.hidden) scheduleRefresh(0) }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      unsubscribe()
+      window.clearInterval(interval)
+      window.clearTimeout(refreshTimer)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
   }, [load])
 
   if (!counts && !error) return <LoadingScreen />
@@ -80,7 +100,12 @@ export function DashboardPage() {
           ))}
         </div>
       ) : (
-        <MetricBarChart title="Workspace totals" description="A visual comparison of the records currently managed by Attendly." items={cards.map(({ label, count, barColor }) => ({ label, value: count, color: barColor }))} />
+        <Suspense fallback={<section className="panel grid min-h-80 place-items-center text-sm text-slate-500">Loading dashboard graphâ€¦</section>}>
+          <DashboardCharts
+            totals={cards.map(({ label, count, barColor }) => ({ label, value: count, color: barColor }))}
+            events={snapshots.map(({ event, summary }) => ({ name: event.name, expected: summary.expected, checkedIn: summary.checkedIn }))}
+          />
+        </Suspense>
       )}
       <section className="panel">
         <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-base font-semibold">Recent event attendance</h2><p className="mt-1 text-sm text-slate-500">Updates automatically when attendance changes.</p></div><Link className="btn-secondary" to="/reports"><BarChart3 size={16} /> Open reports</Link></div>
@@ -89,7 +114,7 @@ export function DashboardPage() {
             const rate = summary.expected ? Math.min(100, Math.round((summary.checkedIn / summary.expected) * 100)) : 0
             return <div className="py-5 first:pt-0 last:pb-0" key={event.id}><div className="flex flex-wrap items-center justify-between gap-3"><div><div className="font-semibold">{event.name}</div><div className="mt-1 text-xs text-slate-500">{formatManilaDate(event.start_at)} · {summary.checkedIn.toLocaleString()}/{summary.expected.toLocaleString()} checked in</div></div><div className="flex gap-2"><Link className="btn-secondary" to={`/reports?event=${event.id}`}><BarChart3 size={14} /> Report</Link>{event.status === 'open' && <Link className="btn-primary" to={`/events/${event.id}/scanner`}><ScanLine size={14} /> Scan</Link>}</div></div><div className="mt-3 flex items-center gap-3"><div className="h-2 flex-1 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"><div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${rate}%` }} /></div><span className="w-9 text-right text-xs font-semibold text-slate-500">{rate}%</span></div></div>
           })}
-          {!snapshots.length && <EmptyState compact icon={CalendarX2} title="No events yet" description="Create your first event to start tracking attendance." action={<Link className="btn-primary" to="/events/new"><CalendarDays size={16} /> Create event</Link>} />}
+          {!snapshots.length && <EmptyState compact icon={CalendarX2} title="No events yet" description="Create your first event to start tracking attendance." action={<Link className="btn-primary" to="/events"><CalendarDays size={16} /> Create event</Link>} />}
         </div>
       </section>
     </div>

@@ -1,4 +1,4 @@
-export type UserRole = 'super_admin' | 'faculty' | 'officer'
+export type UserRole = 'super_admin' | 'admin' | 'faculty' | 'officer'
 export type Sex = 'Male' | 'Female'
 export type AttendanceMode = 'check_in_only' | 'check_in_out'
 export type EventStatus = 'draft' | 'open' | 'closed'

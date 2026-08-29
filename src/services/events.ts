@@ -3,6 +3,7 @@ import type { AttendanceMode, EventRecord, EventStatus } from '../types/app'
 import { invokeFunction } from './functions'
 
 const EVENT_COLUMNS = 'id,name,description,venue,start_at,end_at,check_in_opens_at,late_after,check_in_closes_at,attendance_mode,check_out_opens_at,check_out_closes_at,status,created_by,created_at,updated_at,deleted_at'
+const QUERY_PAGE_SIZE = 500
 
 export interface EventInput {
   name: string
@@ -47,6 +48,10 @@ export async function createEvent(input: EventInput) {
 
 export async function resetEventPin(eventId: string) {
   return invokeFunction<{ pin: string; warning: string }>('reset-event-pin', { event_id: eventId })
+}
+
+export async function viewEventPin(eventId: string) {
+  return invokeFunction<{ pin: string }>('view-event-pin', { event_id: eventId })
 }
 
 export async function getEventAudience(eventId: string) {
@@ -120,11 +125,18 @@ export async function listEventAssignments(eventId: string) {
 }
 
 export async function listEventAssignmentCounts() {
-  const { data, error } = await supabase.from('event_assignments').select('user_id')
-  if (error) throw error
   const counts: Record<string, number> = {}
-  for (const row of data) counts[row.user_id] = (counts[row.user_id] ?? 0) + 1
-  return counts
+  for (let from = 0; ; from += QUERY_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('event_assignments')
+      .select('user_id')
+      .order('event_id')
+      .order('user_id')
+      .range(from, from + QUERY_PAGE_SIZE - 1)
+    if (error) throw error
+    for (const row of data) counts[row.user_id] = (counts[row.user_id] ?? 0) + 1
+    if (data.length < QUERY_PAGE_SIZE) return counts
+  }
 }
 
 export async function assignUser(eventId: string, userId: string, assignedBy: string) {

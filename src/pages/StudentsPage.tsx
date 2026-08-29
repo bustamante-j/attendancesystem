@@ -20,7 +20,8 @@ const PAGE_SIZE = 25
 export function StudentsPage() {
   const confirm = useConfirm()
   const { profile } = useAuth()
-  const isAdmin = profile?.role === 'super_admin'
+  const canManage = profile?.role === 'super_admin' || profile?.role === 'admin'
+  const canViewQr = profile?.role === 'super_admin'
   const [students, setStudents] = useState<Student[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [qrStatuses, setQrStatuses] = useState<Map<string, StudentQrStatus>>(new Map())
@@ -40,17 +41,17 @@ export function StudentsPage() {
   const load = useCallback(async () => {
     try {
       const [studentRows, departmentRows] = await Promise.all([
-        listStudents({ includeDeleted: isAdmin }), listDepartments(),
+        listStudents({ includeDeleted: canManage }), listDepartments(),
       ])
       setStudents(studentRows)
       setDepartments(departmentRows)
-      if (isAdmin) {
+      if (canManage) {
         const statuses = await listStudentQrStatuses(studentRows.filter((item) => !item.deleted_at).map((item) => item.id))
         setQrStatuses(new Map(statuses.map((status) => [status.student_id, status])))
       }
     } catch (cause) { setMessage({ text: friendlyError(cause), tone: 'error' }) }
     finally { setLoading(false) }
-  }, [isAdmin])
+  }, [canManage])
   useEffect(() => { void load() }, [load])
 
   const filtered = useMemo(() => {
@@ -149,31 +150,31 @@ export function StudentsPage() {
     <div className="space-y-5">
       <div className="page-header">
         <div><h1 className="page-title">Students</h1><p className="page-subtitle">Manage records, imports, and secure QR credentials.</p></div>
-        {isAdmin && <div className="flex flex-wrap gap-2"><button className="btn-secondary" onClick={() => setShowImport(true)}><FileUp size={17} /> Import</button><button className="btn-primary" onClick={() => { setMessage(null); setEditing(null) }}><Plus size={17} /> Add student</button></div>}
+        {canManage && <div className="flex flex-wrap gap-2">{canViewQr && <button className="btn-secondary" onClick={() => setShowImport(true)}><FileUp size={17} /> Import</button>}<button className="btn-primary" onClick={() => { setMessage(null); setEditing(null) }}><Plus size={17} /> Add student</button></div>}
       </div>
       {message && <Alert message={message.text} tone={message.tone} />}
       <div className="toolbar">
         <SearchInput value={search} onChange={(value) => { setSearch(value); setPage(1) }} placeholder="Search Student ID or name" />
-        <select className="field max-w-56" value={departmentFilter} onChange={(event) => { setDepartmentFilter(event.target.value); setPage(1) }}><option value="all">All departments</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.code}</option>)}</select>
-        <select className="field max-w-44" value={yearFilter} onChange={(event) => { setYearFilter(event.target.value); setPage(1) }}><option value="all">All year levels</option>{[1, 2, 3, 4].map((year) => <option key={year} value={year}>Year {year}</option>)}</select>
-        {isAdmin && <select className="field max-w-44" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }}><option value="current">Current records</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="deleted">Deleted</option><option value="all">All records</option></select>}
+        <select aria-label="Filter students by department" className="field max-w-56" value={departmentFilter} onChange={(event) => { setDepartmentFilter(event.target.value); setPage(1) }}><option value="all">All departments</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.code}</option>)}</select>
+        <select aria-label="Filter students by year level" className="field max-w-44" value={yearFilter} onChange={(event) => { setYearFilter(event.target.value); setPage(1) }}><option value="all">All year levels</option>{[1, 2, 3, 4].map((year) => <option key={year} value={year}>Year {year}</option>)}</select>
+        {canManage && <select className="field max-w-44" aria-label="Filter students by status" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }}><option value="current">Current records</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="deleted">Deleted</option><option value="all">All records</option></select>}
       </div>
-      {isAdmin && selected.size > 0 && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3"><strong className="text-sm text-blue-900">{selected.size} selected</strong><button className="btn-primary" disabled={busy} onClick={() => void issueBatch()}><Printer size={16} /> Issue and print QR batch</button><button className="btn-secondary" onClick={() => setSelected(new Set())}>Clear selection</button></div>}
+      {canManage && selected.size > 0 && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3"><strong className="text-sm text-blue-900">{selected.size} selected</strong><button className="btn-primary" disabled={busy} onClick={() => void issueBatch()}><Printer size={16} /> Issue and print QR batch</button><button className="btn-secondary" onClick={() => setSelected(new Set())}>Clear selection</button></div>}
       <div className="table-wrap">
         <table>
-          <thead><tr>{isAdmin && <th><input type="checkbox" checked={allPageSelected} onChange={togglePage} aria-label="Select current page" /></th>}<th>Student ID</th><th>Full Name</th><th>Year</th><th>Sex</th><th>Department</th><th>Status</th>{isAdmin && <th>QR Credential</th>}{isAdmin && <th>Actions</th>}</tr></thead>
+          <thead><tr>{canManage && <th><input type="checkbox" checked={allPageSelected} onChange={togglePage} aria-label="Select current page" /></th>}<th>Student ID</th><th>Full Name</th><th>Year</th><th>Sex</th><th>Department</th><th>Status</th>{canManage && <th>QR Credential</th>}{canManage && <th>Actions</th>}</tr></thead>
           <tbody>
             {pageRows.map((student) => {
               const qr = qrStatuses.get(student.id)
               return <tr key={student.id} className={student.deleted_at ? 'bg-red-50/50 text-slate-500' : ''}>
-                {isAdmin && <td><input type="checkbox" disabled={!!student.deleted_at} checked={selected.has(student.id)} onChange={() => setSelected((current) => { const next = new Set(current); if (next.has(student.id)) next.delete(student.id); else next.add(student.id); return next })} aria-label={`Select ${student.full_name}`} /></td>}
+                {canManage && <td><input type="checkbox" disabled={!!student.deleted_at} checked={selected.has(student.id)} onChange={() => setSelected((current) => { const next = new Set(current); if (next.has(student.id)) next.delete(student.id); else next.add(student.id); return next })} aria-label={`Select ${student.full_name}`} /></td>}
                 <td className="font-mono">{student.student_number}</td><td className="font-medium">{student.full_name}</td><td>{student.year_level}</td><td>{student.sex}</td><td>{student.departments?.code ?? '—'}</td>
                 <td>{student.deleted_at ? <span className="rounded-full bg-red-100 px-2 py-1 text-xs text-red-800">Deleted</span> : <span className={`rounded-full px-2 py-1 text-xs ${student.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}`}>{student.is_active ? 'Active' : 'Inactive'}</span>}</td>
-                {isAdmin && <td>{student.deleted_at ? '—' : qr?.has_active_credential ? <div><span className="text-sm text-emerald-700">Issued</span>{qr.issued_at && <div className="text-xs text-slate-500">{formatManilaDate(qr.issued_at)}</div>}</div> : <span className="text-sm text-slate-500">Not issued</span>}</td>}
-                {isAdmin && <td><div className="flex flex-wrap gap-2">{student.deleted_at ? <button className="btn-secondary" onClick={() => void restore(student)}><RotateCcw size={14} /> Restore</button> : <><button className="btn-secondary" onClick={() => setEditing(student)}><Pencil size={14} /> Edit</button><button className="btn-secondary" onClick={() => void toggleActive(student)}>{student.is_active ? 'Deactivate' : 'Activate'}</button>{qr?.has_active_credential && <button className="btn-primary" disabled={busy} onClick={() => void viewQr(student)}><Eye size={14} /> View QR</button>}<button className="btn-secondary" disabled={busy} onClick={() => void issueOne(student)}>{qr?.has_active_credential ? <RotateCcw size={14} /> : <KeyRound size={14} />}{qr?.has_active_credential ? 'Regenerate QR' : 'Issue QR'}</button><button className="btn-danger" onClick={() => void remove(student)} aria-label={`Delete ${student.full_name}`}><Trash2 size={14} /></button></>}</div></td>}
+                {canManage && <td>{student.deleted_at ? '—' : qr?.has_active_credential ? <div><span className="text-sm text-emerald-700">Issued</span>{qr.issued_at && <div className="text-xs text-slate-500">{formatManilaDate(qr.issued_at)}</div>}</div> : <span className="text-sm text-slate-500">Not issued</span>}</td>}
+                {canManage && <td><div className="flex flex-wrap gap-2">{student.deleted_at ? <button className="btn-secondary" onClick={() => void restore(student)}><RotateCcw size={14} /> Restore</button> : <><button className="btn-secondary" onClick={() => setEditing(student)}><Pencil size={14} /> Edit</button><button className="btn-secondary" onClick={() => void toggleActive(student)}>{student.is_active ? 'Deactivate' : 'Activate'}</button>{canViewQr && qr?.has_active_credential && <button className="btn-primary" disabled={busy} onClick={() => void viewQr(student)}><Eye size={14} /> View QR</button>}<button className="btn-secondary" disabled={busy} onClick={() => void issueOne(student)}>{qr?.has_active_credential ? <RotateCcw size={14} /> : <KeyRound size={14} />}{qr?.has_active_credential ? 'Regenerate QR' : 'Issue QR'}</button><button className="btn-danger" onClick={() => void remove(student)} aria-label={`Delete ${student.full_name}`}><Trash2 size={14} /></button></>}</div></td>}
               </tr>
             })}
-            {!pageRows.length && <tr><td colSpan={isAdmin ? 10 : 6}><EmptyState compact icon={SearchX} title="No students found" description="Try changing the search or filters." /></td></tr>}
+            {!pageRows.length && <tr><td colSpan={canManage ? 10 : 6}><EmptyState compact icon={SearchX} title="No students found" description="Try changing the search or filters." /></td></tr>}
           </tbody>
         </table>
       </div>

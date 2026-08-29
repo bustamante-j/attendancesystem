@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { CalendarClock, Clock3, MapPin, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
-import { useForm } from 'react-hook-form'
+import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { Modal } from '../../components/Modal'
 import type { EventInput } from '../../services/events'
@@ -87,6 +87,28 @@ function shiftLocal(value: string, minutes: number) {
   }
 }
 
+function SplitDateTimeField({ label, value, onChange, error }: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+  error?: string
+}) {
+  const [date = '', time = ''] = value.split('T')
+  const updateDate = (nextDate: string) => onChange(nextDate ? `${nextDate}T${time || '00:00'}` : '')
+  const updateTime = (nextTime: string) => onChange(date && nextTime ? `${date}T${nextTime}` : value)
+
+  return (
+    <fieldset className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/40">
+      <legend className="px-1 text-sm font-semibold text-slate-800 dark:text-slate-100">{label}</legend>
+      <div className="mt-1 grid gap-3 sm:grid-cols-[minmax(0,1.25fr)_minmax(8rem,0.75fr)]">
+        <label><span className="label text-xs">Date</span><input className="field" type="date" value={date} onChange={(event) => updateDate(event.target.value)} /></label>
+        <label><span className="label text-xs">Time</span><input className="field" type="time" value={time} disabled={!date} onChange={(event) => updateTime(event.target.value)} /></label>
+      </div>
+      {error && <span className="mt-2 block text-xs text-red-700 dark:text-red-400">{error}</span>}
+    </fieldset>
+  )
+}
+
 export function EventFormModal({ event, audience, departments, onClose, onSave }: {
   event: EventRecord | null
   audience: { departmentIds: string[]; yearLevels: number[] } | null
@@ -95,7 +117,7 @@ export function EventFormModal({ event, audience, departments, onClose, onSave }
   onSave: (input: EventInput) => Promise<void>
 }) {
   const [timingPreset, setTimingPreset] = useState<TimingPreset>(event ? 'custom' : 'standard')
-  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<Values>({
+  const { control, register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<Values>({
     resolver: zodResolver(schema),
     defaultValues: defaults(event, audience, departments[0]?.id ?? ''),
   })
@@ -145,10 +167,11 @@ export function EventFormModal({ event, audience, departments, onClose, onSave }
           <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
             <div className="flex items-center gap-2"><CalendarClock size={18} className="text-blue-600" /><div><h3 className="font-semibold">Schedule</h3><p className="text-xs text-slate-500">All times use Asia/Manila.</p></div></div>
           </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label><span className="label">Starts</span><input className="field" type="datetime-local" {...register('start_at')} />{errors.start_at && <span className="mt-1 block text-xs text-red-700 dark:text-red-400">{errors.start_at.message}</span>}</label>
-            <label><span className="label">Ends</span><input className="field" type="datetime-local" {...register('end_at')} />{errors.end_at && <span className="mt-1 block text-xs text-red-700 dark:text-red-400">{errors.end_at.message}</span>}</label>
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Controller control={control} name="start_at" render={({ field }) => <SplitDateTimeField label="Event starts" value={field.value} onChange={field.onChange} error={errors.start_at?.message} />} />
+            <Controller control={control} name="end_at" render={({ field }) => <SplitDateTimeField label="Event ends" value={field.value} onChange={field.onChange} error={errors.end_at?.message} />} />
           </div>
+          <p className="mt-3 text-xs text-slate-500">Start and end dates can be different, so multi-day events such as intramurals are supported.</p>
         </section>
 
         <section className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">

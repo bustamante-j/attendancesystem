@@ -14,20 +14,27 @@ export function QrCredentialModal({ students, credentials, mode, onClose }: { st
 
   useEffect(() => {
     let current = true
-    void Promise.all(credentials.map(async (item) => {
-      const student = studentMap.get(item.studentId)
-      if (!student) throw new Error('A selected student is no longer available.')
-      return {
-        student,
-        dataUrl: await createQrCardDataUrl(item.credential, {
+    setCards([])
+    setError(null)
+    const renderCards = async () => {
+      for (const item of credentials) {
+        const student = studentMap.get(item.studentId)
+        if (!student) throw new Error('A selected student is no longer available.')
+        const dataUrl = await createQrCardDataUrl(item.credential, {
           fullName: student.full_name,
           studentNumber: student.student_number,
           sex: student.sex,
           departmentCode: student.departments?.code,
           yearLevel: student.year_level,
-        }),
+        })
+        if (!current) return
+        setCards((rendered) => [...rendered, { student, dataUrl }])
+        await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()))
       }
-    })).then((result) => { if (current) setCards(result) }).catch((cause: unknown) => { if (current) setError(cause instanceof Error ? cause.message : 'QR images could not be rendered.') })
+    }
+    void renderCards().catch((cause: unknown) => {
+      if (current) setError(cause instanceof Error ? cause.message : 'QR images could not be rendered.')
+    })
     return () => { current = false }
   }, [credentials, studentMap])
 
@@ -41,7 +48,7 @@ export function QrCredentialModal({ students, credentials, mode, onClose }: { st
         <button className="btn-primary" disabled={cards.length !== credentials.length} onClick={() => window.print()}><Printer size={17} /> Print credential sheet</button>
         <span className="self-center text-sm text-slate-500">Use each card’s download button for an individual PNG.</span>
       </div>
-      {!cards.length && !error && <div className="py-12 text-center text-slate-500">Rendering secure QR images…</div>}
+      {cards.length < credentials.length && !error && <div className="py-4 text-center text-sm text-slate-500" aria-live="polite">Rendering secure QR images… {cards.length} of {credentials.length}</div>}
       <div className="qr-print-area grid gap-5 sm:grid-cols-2 lg:grid-cols-3 print:grid-cols-2">
         {cards.map((card) => <article className="qr-print-card break-inside-avoid rounded-xl border border-slate-200 bg-white p-3 text-center" key={card.student.id}>
           <img className="mx-auto w-full max-w-sm" src={card.dataUrl} alt={`Attendly QR card for ${card.student.full_name}, ${card.student.student_number}, ${card.student.sex}`} />

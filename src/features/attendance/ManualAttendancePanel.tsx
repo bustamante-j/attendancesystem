@@ -1,7 +1,7 @@
-import { Search, UserCheck } from 'lucide-react'
+import { RotateCcw, Search, UserCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { friendlyError } from '../../lib/errors'
-import { processManualAttendance, searchEventStudents, type AttendanceDirection } from '../../services/attendance'
+import { processManualAttendance, searchEventStudents, undoLastManualAttendance, type AttendanceDirection } from '../../services/attendance'
 import type { AttendanceResult, EventStudentSearchResult } from '../../types/app'
 
 export function ManualAttendancePanel({ eventId, direction, onResult }: {
@@ -13,6 +13,8 @@ export function ManualAttendancePanel({ eventId, direction, onResult }: {
   const [students, setStudents] = useState<EventStudentSearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [processingId, setProcessingId] = useState<string | null>(null)
+  const [undoing, setUndoing] = useState(false)
+  const [lastAction, setLastAction] = useState<{ attendanceId: string; studentId: string; fullName: string; direction: AttendanceDirection } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
@@ -43,6 +45,9 @@ export function ManualAttendancePanel({ eventId, direction, onResult }: {
     try {
       const result = await processManualAttendance(eventId, student.student_id, direction)
       await onResult(result, 'manual')
+      if (result.attendance?.id && ['success_present', 'success_late', 'success_checkout'].includes(result.code)) {
+        setLastAction({ attendanceId: result.attendance.id, studentId: student.student_id, fullName: student.full_name, direction })
+      }
       setStudents((current) => current.map((item) => item.student_id === student.student_id
         ? {
             ...item,
@@ -58,6 +63,26 @@ export function ManualAttendancePanel({ eventId, direction, onResult }: {
     }
   }
 
+  const undoLastAction = async () => {
+    if (!lastAction) return
+    setUndoing(true)
+    setError(null)
+    try {
+      const result = await undoLastManualAttendance(eventId, lastAction.attendanceId, lastAction.direction)
+      await onResult(result, 'manual')
+      setStudents((current) => current.map((student) => student.student_id !== lastAction.studentId
+        ? student
+        : lastAction.direction === 'check_in'
+          ? { ...student, check_in_at: null, check_in_status: null, check_out_at: null }
+          : { ...student, check_out_at: null }))
+      setLastAction(null)
+    } catch (cause) {
+      setError(friendlyError(cause, 'The last manual action could not be undone.'))
+    } finally {
+      setUndoing(false)
+    }
+  }
+
   return (
     <section className="panel">
       <div className="flex items-center gap-2">
@@ -67,9 +92,16 @@ export function ManualAttendancePanel({ eventId, direction, onResult }: {
           <p className="text-xs text-slate-500">Search eligible students by name or student ID.</p>
         </div>
       </div>
+      {lastAction && (
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/40">
+          <p className="text-sm text-amber-950 dark:text-amber-100">Last manual action: <strong>{lastAction.direction === 'check_in' ? 'check-in' : 'check-out'} for {lastAction.fullName}</strong></p>
+          <button className="btn-secondary" disabled={undoing} onClick={() => void undoLastAction()}><RotateCcw size={16} /> {undoing ? 'Undoing…' : 'Undo last action'}</button>
+        </div>
+      )}
       <div className="relative mt-4">
         <Search className="pointer-events-none absolute left-3 top-2.5 text-slate-400" size={18} />
         <input
+          aria-label="Search eligible students for manual attendance"
           className="field pl-10"
           value={query}
           onChange={(event) => setQuery(event.target.value)}

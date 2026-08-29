@@ -5,7 +5,33 @@ import type { Profile } from '../../types/app'
 import { usernameToInternalEmail } from '../../utils/auth'
 
 const SESSION_STARTED_KEY = 'attendly_session_started_at'
+const CACHED_PROFILE_KEY = 'attendly_last_verified_profile'
 const MAX_SESSION_MS = 12 * 60 * 60 * 1000
+
+function readCachedProfile(userId: string) {
+  try {
+    const cached = JSON.parse(localStorage.getItem(CACHED_PROFILE_KEY) ?? 'null') as { userId?: string; profile?: Profile } | null
+    return cached?.userId === userId && cached.profile ? cached.profile : null
+  } catch {
+    return null
+  }
+}
+
+function writeCachedProfile(userId: string, profile: Profile) {
+  try {
+    localStorage.setItem(CACHED_PROFILE_KEY, JSON.stringify({ userId, profile }))
+  } catch {
+    // A verified profile is only an offline convenience; auth still works if storage is unavailable.
+  }
+}
+
+function removeCachedProfile() {
+  try {
+    localStorage.removeItem(CACHED_PROFILE_KEY)
+  } catch {
+    // Ignore storage restrictions while clearing the in-memory session below.
+  }
+}
 
 interface AuthContextValue {
   session: Session | null
@@ -25,9 +51,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearLocalSession = useCallback(async () => {
     sessionStorage.removeItem(SESSION_STARTED_KEY)
+    removeCachedProfile()
     setSession(null)
     setProfile(null)
-    await supabase.auth.signOut()
+    try {
+      await supabase.auth.signOut({ scope: 'local' })
+    } catch {
+      // Local state has already been cleared, including when the device is offline.
+    }
   }, [])
 
   const loadProfile = useCallback(async (activeSession: Session | null) => {
@@ -49,7 +80,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .from('profiles')
       .select('*')
       .eq('id', activeSession.user.id)
-      .single()
+      .maybeSingle()
+
+    if (error) {
+      // A timeout or connection loss must not be treated as a disabled/revoked account.
+      // The database still authorizes every operation, and the next online check revalidates.
+      setProfile((current) => current?.id === activeSession.user.id
+        ? current
+        : readCachedProfile(activeSession.user.id))
+      setLoading(false)
+      return
+    }
+
     const nextProfile = data as Profile | null
     const signedInAt = activeSession.user.last_sign_in_at
       ? new Date(activeSession.user.last_sign_in_at).getTime()
@@ -58,12 +100,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ? new Date(nextProfile.session_revoked_at).getTime() >= signedInAt
       : false
 
-    if (error || !nextProfile?.is_enabled || wasRevoked) {
+    if (!nextProfile?.is_enabled || wasRevoked) {
       await clearLocalSession()
       setLoading(false)
       return
     }
     setProfile(nextProfile)
+    writeCachedProfile(activeSession.user.id, nextProfile)
     setLoading(false)
   }, [clearLocalSession])
 
@@ -86,14 +129,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       void loadProfile(nextSession)
     })
-    const interval = window.setInterval(() => {
-      void supabase.auth.getSession().then(({ data }) => loadProfile(data.session))
-    }, 60_000)
+    let profileCheckInFlight = false
+    const verifyProfile = async () => {
+      if (profileCheckInFlight || !navigator.onLine || document.visibilityState === 'hidden') return
+      profileCheckInFlight = true
+      try {
+        const { data, error } = await supabase.auth.getSession()
+        if (!error) await loadProfile(data.session)
+      } finally {
+        profileCheckInFlight = false
+      }
+    }
+    const handleVisibility = () => { if (document.visibilityState === 'visible') void verifyProfile() }
+    const handleOnline = () => { void verifyProfile() }
+    const interval = window.setInterval(() => { void verifyProfile() }, 60_000)
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('online', handleOnline)
 
     return () => {
       mounted = false
       listener.subscription.unsubscribe()
       window.clearInterval(interval)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('online', handleOnline)
     }
   }, [loadProfile])
 

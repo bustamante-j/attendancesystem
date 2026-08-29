@@ -19,12 +19,12 @@ async function escrowKey() {
   return crypto.subtle.importKey('raw', bytes, { name: 'AES-GCM' }, false, ['encrypt', 'decrypt'])
 }
 
-export async function encryptQrCredential(credential: string) {
+export async function encryptEscrowedSecret(secret: string) {
   const iv = crypto.getRandomValues(new Uint8Array(12))
   const ciphertext = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
     await escrowKey(),
-    new TextEncoder().encode(credential),
+    new TextEncoder().encode(secret),
   )
   return {
     encryptedToken: base64UrlEncode(new Uint8Array(ciphertext)),
@@ -32,7 +32,7 @@ export async function encryptQrCredential(credential: string) {
   }
 }
 
-export async function decryptQrCredential(encryptedToken: string, encryptionIv: string) {
+export async function decryptEscrowedSecret(encryptedToken: string, encryptionIv: string) {
   try {
     const plaintext = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv: base64UrlDecode(encryptionIv) },
@@ -44,3 +44,6 @@ export async function decryptQrCredential(encryptedToken: string, encryptionIv: 
     throw new Error('The stored QR credential could not be decrypted.')
   }
 }
+
+export const encryptQrCredential = encryptEscrowedSecret
+export const decryptQrCredential = decryptEscrowedSecret

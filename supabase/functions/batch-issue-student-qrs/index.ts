@@ -17,7 +17,7 @@ Deno.serve(async (request) => {
   if (request.method !== 'POST') return jsonResponse({ error: 'Method not allowed.' }, 405)
 
   try {
-    const { profile: actor, admin } = await requireActor(request, ['super_admin'])
+    const { profile: actor, admin } = await requireActor(request, ['super_admin', 'admin'])
     const body = await request.json()
     const studentIds = Array.isArray(body.student_ids) ? body.student_ids : []
     if (studentIds.length < 1 || studentIds.length > 500) throw new Error('Select 1 to 500 students.')

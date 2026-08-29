@@ -17,7 +17,7 @@ Deno.serve(async (request) => {
   if (request.method !== 'POST') return jsonResponse({ error: 'Method not allowed.' }, 405)
 
   try {
-    const { profile: actor, admin } = await requireActor(request, ['super_admin'])
+    const { profile: actor, admin } = await requireActor(request, ['super_admin', 'admin'])
     const body = await request.json()
     const studentId = typeof body.student_id === 'string' ? body.student_id : ''
     if (!/^[0-9a-f-]{36}$/i.test(studentId)) throw new Error('A valid student is required.')
@@ -34,7 +34,13 @@ Deno.serve(async (request) => {
       p_encrypted_token: encrypted.encryptedToken,
       p_encryption_iv: encrypted.encryptionIv,
     })
-    if (error) throw new Error(error.code === 'P0002' ? 'Student not found.' : 'The QR credential could not be issued.')
+    if (error) {
+      console.error('QR issuance database error', { code: error.code, message: error.message })
+      if (error.code === 'P0002') throw new Error('Student not found.')
+      if (error.code === '22023') throw new Error('The encrypted QR credential failed database validation.')
+      if (error.code === '23505') throw new Error('A conflicting QR credential already exists. Try again.')
+      throw new Error(`The QR credential could not be issued. Reference: ${error.code || 'database_error'}.`)
+    }
 
     return jsonResponse({
       credentialId,

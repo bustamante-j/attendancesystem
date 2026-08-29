@@ -6,6 +6,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  MonitorDown,
   Users,
   UserRoundCog,
   X,
@@ -13,11 +14,13 @@ import {
 import { useState } from 'react'
 import { NavLink, Outlet } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthProvider'
+import { usePwaInstall } from '../features/pwa/usePwaInstall'
 import { ThemeToggle } from '../features/theme/ThemeProvider'
 import { BrandLogo } from './BrandLogo'
 
 export function AppLayout() {
   const { profile, signOut } = useAuth()
+  const { canInstall, install } = usePwaInstall()
   const [open, setOpen] = useState(false)
   if (!profile) return null
 
@@ -31,6 +34,14 @@ export function AppLayout() {
         { to: '/users', label: 'Users', icon: UserRoundCog },
         ...(import.meta.env.DEV ? [{ to: '/dev', label: 'Dev Tools', icon: Code2 }] : []),
       ]
+    : profile.role === 'admin'
+      ? [
+          { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+          { to: '/students', label: 'Students', icon: Users },
+          { to: '/departments', label: 'Departments', icon: Building2 },
+          { to: '/events', label: 'Events', icon: CalendarDays },
+          { to: '/reports', label: 'Reports', icon: BarChart3 },
+        ]
     : profile.role === 'faculty'
       ? [
           { to: '/', label: 'Dashboard', icon: LayoutDashboard },
@@ -102,6 +113,11 @@ export function AppLayout() {
         </nav>
 
         <div className="border-t border-white/10 p-4">
+          {canInstall && (
+            <button className="btn mb-3 w-full border border-blue-400/20 bg-blue-500/15 text-blue-100 hover:bg-blue-500/25" onClick={() => void install()}>
+              <MonitorDown size={16} /> Install Attendly
+            </button>
+          )}
           <div className="mb-3 flex items-center gap-3 rounded-xl bg-white/5 p-3">
             <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-blue-500/20 text-xs font-bold text-blue-300">
               {initials || 'A'}

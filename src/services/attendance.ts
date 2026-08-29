@@ -25,6 +25,16 @@ export async function processManualAttendance(eventId: string, studentId: string
   return data as AttendanceResult
 }
 
+export async function undoLastManualAttendance(eventId: string, attendanceId: string, direction: AttendanceDirection) {
+  const { data, error } = await supabase.rpc('undo_last_manual_attendance', {
+    p_event_id: eventId,
+    p_attendance_id: attendanceId,
+    p_direction: direction,
+  })
+  if (error) throw error
+  return data as AttendanceResult
+}
+
 export async function verifyEventPin(eventId: string, pin: string) {
   const { data, error } = await supabase.rpc('verify_event_pin', { p_event_id: eventId, p_pin: pin })
   if (error) throw error

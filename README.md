@@ -1,25 +1,26 @@
 # Attendly
 
-Attendly is a reusable QR-based event attendance system for schools and organizations. This repository contains **Iterations 1–5 — Foundation, Core Admin, QR Attendance, Reporting, and Design + UX**: a secure Supabase data/RPC layer, polished operational workflows, a production mobile scanner, and live reporting/export tools.
+Attendly is a reusable QR-based event attendance system for schools and organizations. This repository contains **Iterations 1–6 — Foundation, Core Admin, QR Attendance, Reporting, Design + UX, and Production Readiness**: a secure Supabase data/RPC layer, polished operational workflows, a production mobile scanner, live reporting/export tools, and an installable PWA shell.
 
 The starter department is Information Technology (`IT`), and events and students use department relationships so each organization can add its own structure.
 
 ## Implemented scope
 
 - Username/password staff login backed by Supabase email/password Auth
-- Roles: `super_admin`, `faculty`, and `officer`; students never have accounts
+- Roles: `super_admin`, `admin`, `faculty`, and `officer`; students never have accounts
+- Admins manage departments, students, QR issuance, events, assignments, reports, and attendance corrections; user administration, audit logs, raw QR viewing, and event PIN viewing remain Super Admin-only
 - Departments, students, soft deletes, active/inactive students, and profile/session controls
 - Validated CSV/XLSX student import with preview, source-row errors, optional matching-record updates, and database revalidation
 - One-time and atomic batch student QR credential issuance with SHA-256 hashes only in the database
 - Branded QR card rendering with the student's name, ID number, sex, department/year, individual PNG downloads, regeneration, and printable batch sheets
 - Department CRUD with protected soft deletion and restoration
 - Searchable/filterable student and user management, deleted-student restoration, profile editing, password reset, disabling, and session revocation
-- Events, department/year audiences, expected-student functions, assignments, statuses, and hashed six-digit PINs
+- Multi-day events with separate date/time controls, department/year audiences, expected-student functions, assignments, statuses, and hashed six-digit PINs
 - Temporary 12-hour PIN access grants for assigned scanners
-- Atomic QR/manual attendance RPCs with database time, eligibility/window checks, late calculation, check-out updates, and duplicate-race handling
+- Atomic QR/manual attendance RPCs with database time, eligibility/window checks, late calculation, check-out updates, duplicate-race handling, and a five-minute undo for the latest manual action by the same operator
 - Super Admin attendance-correction RPC and administrative audit infrastructure
 - RLS on every application table and restricted table/column grants
-- Super Admin bootstrap script and seven privileged Edge Functions
+- Super Admin bootstrap script and nine privileged Edge Functions
 - Improved event CRUD, schedule validation, audience summaries, secure PIN lifecycle, status controls, and scanner assignments
 - Mobile phone-camera QR scanning with environment-camera preference and a dedicated scan frame
 - Event PIN gate, check-in/check-out direction, three-second repeat cooldown, and serial scan processing
@@ -41,8 +42,11 @@ The starter department is Information Technology (`IT`), and events and students
 - Recharts-powered responsive charts with tooltips, axes, legends, stacked breakdowns, and attendance composition
 - Simplified event scheduling with Standard, Strict, and Advanced attendance-window presets
 - Audited Super Admin QR viewing with server-only AES-GCM encryption for newly issued credentials
+- Audited Super Admin event PIN re-viewing with server-only AES-GCM escrow; older events require one PIN reset before re-viewing
+- Paginated student/report queries and coalesced realtime refreshes for datasets larger than Supabase's default 1,000-row response limit
+- Installable PWA assets, offline-launch shell, update prompts, production caching rules, and security headers
 
-Iteration 5 intentionally does not include PWA installation or offline support; those remain part of the final deployment iteration.
+Offline launch uses cached application assets only. Authentication, attendance scans, QR issuance, reports, and all data changes still require an internet connection.
 
 ## Technology
 
@@ -106,6 +110,7 @@ npx supabase functions deploy reset-event-pin --use-api
 npx supabase functions deploy batch-issue-student-qrs --use-api
 npx supabase functions deploy update-user --use-api
 npx supabase functions deploy view-student-qr --use-api
+npx supabase functions deploy view-event-pin --use-api
 ```
 
 Before deploying the QR functions, generate the QR escrow key locally, set it once, and remove it from the terminal session:

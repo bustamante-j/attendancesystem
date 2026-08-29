@@ -1,4 +1,4 @@
-import { BrowserQRCodeReader, type IScannerControls } from '@zxing/browser'
+import type { IScannerControls } from '@zxing/browser'
 import { Camera, LoaderCircle } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 
@@ -17,7 +17,8 @@ export function ScannerCamera({ enabled, processing, onDecode, onError }: {
   useEffect(() => { onErrorRef.current = onError }, [onError])
 
   useEffect(() => {
-    if (!enabled || !videoRef.current) return
+    const videoElement = videoRef.current
+    if (!enabled || !videoElement) return
     if (!navigator.mediaDevices?.getUserMedia) {
       onErrorRef.current('Camera scanning is not supported by this browser.')
       return
@@ -25,31 +26,33 @@ export function ScannerCamera({ enabled, processing, onDecode, onError }: {
 
     let disposed = false
     let controls: IScannerControls | null = null
-    const reader = new BrowserQRCodeReader(undefined, {
-      delayBetweenScanAttempts: 120,
-      delayBetweenScanSuccess: 700,
-    })
     setStarting(true)
 
-    void reader.decodeFromConstraints(
-      {
-        audio: false,
-        video: {
-          facingMode: { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+    void import('@zxing/browser').then(({ BrowserQRCodeReader }) => {
+      if (disposed) return null
+      const reader = new BrowserQRCodeReader(undefined, {
+        delayBetweenScanAttempts: 120,
+        delayBetweenScanSuccess: 700,
+      })
+      return reader.decodeFromConstraints(
+        {
+          audio: false,
+          video: {
+            facingMode: { ideal: 'environment' },
+            width: { ideal: 1280 },
+            height: { ideal: 720 },
+          },
         },
-      },
-      videoRef.current,
-      (result) => {
-        if (result && !disposed) onDecodeRef.current(result.getText())
-      },
-    ).then((nextControls) => {
-      setStarting(false)
+        videoElement,
+        (result) => {
+          if (result && !disposed) onDecodeRef.current(result.getText())
+        },
+      )
+    }).then((nextControls) => {
+      if (!nextControls) return
       if (disposed) nextControls.stop()
       else controls = nextControls
     }).catch((cause: unknown) => {
-      setStarting(false)
       if (disposed) return
       const name = cause instanceof DOMException ? cause.name : ''
       const message = name === 'NotAllowedError'
@@ -58,8 +61,10 @@ export function ScannerCamera({ enabled, processing, onDecode, onError }: {
           ? 'No camera was found on this device.'
           : name === 'NotReadableError'
             ? 'The camera is already in use by another application.'
-            : 'The camera could not be started. Check its permission and try again.'
+          : 'The camera could not be started. Check its permission and try again.'
       onErrorRef.current(message)
+    }).finally(() => {
+      if (!disposed) setStarting(false)
     })
 
     return () => {
@@ -77,7 +82,7 @@ export function ScannerCamera({ enabled, processing, onDecode, onError }: {
           <span className="text-sm font-medium">Camera is ready to start</span>
         </div>
       )}
-      {starting && (
+      {enabled && starting && (
         <div className="absolute inset-0 flex items-center justify-center bg-slate-950/70 text-white">
           <LoaderCircle className="animate-spin" size={30} />
           <span className="ml-2 text-sm">Starting camera…</span>

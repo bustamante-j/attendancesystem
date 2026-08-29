@@ -2,6 +2,8 @@ import { supabase } from '../lib/supabase'
 import type { Student } from '../types/app'
 import { invokeFunction } from './functions'
 
+const QUERY_PAGE_SIZE = 500
+
 export interface StudentInput {
   student_number: string
   full_name: string
@@ -12,14 +14,20 @@ export interface StudentInput {
 }
 
 export async function listStudents({ includeDeleted = false }: { includeDeleted?: boolean } = {}) {
-  let query = supabase
-    .from('students')
-    .select('*,departments(id,name,code)')
-    .order('full_name')
-  if (!includeDeleted) query = query.is('deleted_at', null)
-  const { data, error } = await query
-  if (error) throw error
-  return data as Student[]
+  const rows: Student[] = []
+  for (let from = 0; ; from += QUERY_PAGE_SIZE) {
+    let query = supabase
+      .from('students')
+      .select('*,departments(id,name,code)')
+      .order('full_name')
+      .order('id')
+      .range(from, from + QUERY_PAGE_SIZE - 1)
+    if (!includeDeleted) query = query.is('deleted_at', null)
+    const { data, error } = await query
+    if (error) throw error
+    rows.push(...(data as Student[]))
+    if (data.length < QUERY_PAGE_SIZE) return rows
+  }
 }
 
 export async function createStudent(input: StudentInput) {
@@ -75,11 +83,27 @@ export interface StudentQrStatus {
 }
 
 export async function listStudentQrStatuses(studentIds?: string[]) {
-  const { data, error } = await supabase.rpc('get_student_qr_statuses', {
-    p_student_ids: studentIds?.length ? studentIds : null,
-  })
-  if (error) throw error
-  return data as StudentQrStatus[]
+  if (studentIds?.length) {
+    const rows: StudentQrStatus[] = []
+    for (let index = 0; index < studentIds.length; index += QUERY_PAGE_SIZE) {
+      const { data, error } = await supabase.rpc('get_student_qr_statuses', {
+        p_student_ids: studentIds.slice(index, index + QUERY_PAGE_SIZE),
+      })
+      if (error) throw error
+      rows.push(...(data as StudentQrStatus[]))
+    }
+    return rows
+  }
+
+  const rows: StudentQrStatus[] = []
+  for (let from = 0; ; from += QUERY_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .rpc('get_student_qr_statuses', { p_student_ids: null })
+      .range(from, from + QUERY_PAGE_SIZE - 1)
+    if (error) throw error
+    rows.push(...(data as StudentQrStatus[]))
+    if (data.length < QUERY_PAGE_SIZE) return rows
+  }
 }
 
 export async function batchIssueStudentQrs(studentIds: string[]) {

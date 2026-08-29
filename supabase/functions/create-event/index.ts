@@ -1,4 +1,5 @@
 import { corsHeaders, errorResponse, jsonResponse, requireActor, requireNonBlank } from '../_shared/http.ts'
+import { encryptEscrowedSecret } from '../_shared/qr-escrow.ts'
 
 function secureSixDigitPin() {
   const limit = Math.floor(0x1_0000_0000 / 1_000_000) * 1_000_000
@@ -18,7 +19,7 @@ Deno.serve(async (request) => {
   if (request.method !== 'POST') return jsonResponse({ error: 'Method not allowed.' }, 405)
 
   try {
-    const { profile: actor, admin } = await requireActor(request, ['super_admin', 'faculty'])
+    const { profile: actor, admin } = await requireActor(request, ['super_admin', 'admin', 'faculty'])
     const body = await request.json()
     const mode = body.attendance_mode
     if (!['check_in_only', 'check_in_out'].includes(mode)) throw new Error('Invalid attendance mode.')
@@ -30,6 +31,7 @@ Deno.serve(async (request) => {
     }
 
     const pin = secureSixDigitPin()
+    const encryptedPin = await encryptEscrowedSecret(pin)
     const params = {
       p_actor_id: actor.id,
       p_name: requireNonBlank(body.name, 'Event name'),
@@ -46,6 +48,8 @@ Deno.serve(async (request) => {
       p_department_ids: departments,
       p_year_levels: years,
       p_plaintext_pin: pin,
+      p_encrypted_pin: encryptedPin.encryptedToken,
+      p_pin_encryption_iv: encryptedPin.encryptionIv,
     }
     const { data: eventId, error } = await admin.rpc('create_event_secure', params)
     if (error) throw new Error('The event could not be created. Check the schedule and audience values.')
@@ -53,7 +57,7 @@ Deno.serve(async (request) => {
     return jsonResponse({
       eventId,
       pin,
-      warning: 'This PIN is shown once. Reset it if it is lost.',
+      warning: 'This PIN can be securely viewed again by a Super Admin.',
     }, 201)
   } catch (error) {
     return errorResponse(error)

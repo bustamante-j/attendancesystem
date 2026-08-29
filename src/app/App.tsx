@@ -28,11 +28,11 @@ export function App() {
         <Route path="/login" element={<LoginPage />} />
         <Route element={<ProtectedRoute><AppLayout /></ProtectedRoute>}>
           <Route index element={<HomePage />} />
-          <Route path="students" element={<ProtectedRoute roles={['super_admin', 'faculty']}><StudentsPage /></ProtectedRoute>} />
-          <Route path="departments" element={<ProtectedRoute roles={['super_admin']}><DepartmentsPage /></ProtectedRoute>} />
+          <Route path="students" element={<ProtectedRoute roles={['super_admin', 'admin', 'faculty']}><StudentsPage /></ProtectedRoute>} />
+          <Route path="departments" element={<ProtectedRoute roles={['super_admin', 'admin']}><DepartmentsPage /></ProtectedRoute>} />
           <Route path="events" element={<EventsPage />} />
           <Route path="events/:eventId/scanner" element={<ScannerPage />} />
-          <Route path="reports" element={<ProtectedRoute roles={['super_admin', 'faculty']}><ReportsPage /></ProtectedRoute>} />
+          <Route path="reports" element={<ProtectedRoute roles={['super_admin', 'admin', 'faculty']}><ReportsPage /></ProtectedRoute>} />
           <Route path="users" element={<ProtectedRoute roles={['super_admin']}><UsersPage /></ProtectedRoute>} />
           <Route path="dev" element={<ProtectedRoute roles={['super_admin']}><DevPage /></ProtectedRoute>} />
           <Route path="*" element={<NotFoundPage />} />

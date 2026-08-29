@@ -1,10 +1,18 @@
 import { supabase } from '../lib/supabase'
 import type { AttendanceReportRow, StudentAttendanceHistoryRow } from '../types/app'
 
+const QUERY_PAGE_SIZE = 500
+
 export async function getEventAttendanceReport(eventId: string) {
-  const { data, error } = await supabase.rpc('get_event_attendance_report', { p_event_id: eventId })
-  if (error) throw error
-  return data as AttendanceReportRow[]
+  const rows: AttendanceReportRow[] = []
+  for (let from = 0; ; from += QUERY_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .rpc('get_event_attendance_report', { p_event_id: eventId })
+      .range(from, from + QUERY_PAGE_SIZE - 1)
+    if (error) throw error
+    rows.push(...(data as AttendanceReportRow[]))
+    if (data.length < QUERY_PAGE_SIZE) return rows
+  }
 }
 
 export async function getStudentAttendanceHistory(studentId: string) {

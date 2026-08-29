@@ -1,7 +1,6 @@
-import { BarChart3, Download, History, Pencil, PieChart as PieChartIcon, Radio, RefreshCw, Search, SearchX } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Download, History, Pencil, Radio, RefreshCw, Search, SearchX } from 'lucide-react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Alert } from '../components/Alert'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingScreen } from '../components/LoadingScreen'
@@ -9,6 +8,7 @@ import { SearchInput } from '../components/SearchInput'
 import { ViewModeToggle, type ViewMode } from '../components/ViewModeToggle'
 import { AttendanceEditModal } from '../features/reports/AttendanceEditModal'
 import { exportAttendanceReport } from '../features/reports/exportReport'
+import type { ReportGroupSummary } from '../features/reports/ReportCharts'
 import { StudentHistoryModal, type StudentHistoryTarget } from '../features/reports/StudentHistoryModal'
 import { useAuth } from '../features/auth/AuthProvider'
 import { friendlyError } from '../lib/errors'
@@ -21,38 +21,25 @@ import { formatManilaDate } from '../utils/dates'
 
 const PAGE_SIZE = 50
 
-interface GroupSummary {
-  label: string
-  expected: number
-  present: number
-  late: number
-  absent: number
-}
+const ReportCharts = lazy(() => import('../features/reports/ReportCharts').then((module) => ({ default: module.ReportCharts })))
 
 function groupReport(rows: AttendanceReportRow[], labelFor: (row: AttendanceReportRow) => string) {
-  const groups = new Map<string, GroupSummary>()
+  const groups = new Map<string, ReportGroupSummary>()
   for (const row of rows) {
     const label = labelFor(row)
     const current = groups.get(label) ?? { label, expected: 0, present: 0, late: 0, absent: 0 }
-    if (row.is_expected) current.expected += 1
-    if (row.attendance_status === 'present') current.present += 1
-    if (row.attendance_status === 'late') current.late += 1
-    if (row.attendance_status === 'absent' && row.is_expected) current.absent += 1
+    if (row.is_expected) {
+      current.expected += 1
+      if (row.attendance_status === 'present') current.present += 1
+      if (row.attendance_status === 'late') current.late += 1
+      if (row.attendance_status === 'absent') current.absent += 1
+    }
     groups.set(label, current)
   }
   return [...groups.values()].sort((left, right) => left.label.localeCompare(right.label, undefined, { numeric: true }))
 }
 
-function SummaryChart({ title, rows }: { title: string; rows: GroupSummary[] }) {
-  return (
-    <section className="panel">
-      <div className="flex items-center gap-2"><BarChart3 size={18} /><h2 className="font-semibold">{title}</h2></div>
-      {rows.length ? <div className="mt-4 h-72 min-w-0" role="img" aria-label={`${title} attendance graph`}><ResponsiveContainer width="100%" height="100%"><BarChart data={rows} layout="vertical" margin={{ top: 8, right: 8, left: 4, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#cbd5e1" strokeOpacity={0.55} /><XAxis type="number" allowDecimals={false} tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} /><YAxis type="category" dataKey="label" width={66} tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} /><Tooltip contentStyle={{ borderRadius: 12, borderColor: '#cbd5e1', boxShadow: '0 10px 30px rgba(15,23,42,0.12)' }} /><Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} /><Bar dataKey="present" name="Present" stackId="attendance" fill="#10b981" radius={[5, 0, 0, 5]} /><Bar dataKey="late" name="Late" stackId="attendance" fill="#f59e0b" /><Bar dataKey="absent" name="Absent" stackId="attendance" fill="#94a3b8" radius={[0, 5, 5, 0]} /></BarChart></ResponsiveContainer></div> : <p className="py-8 text-center text-sm text-slate-500">No summary data.</p>}
-    </section>
-  )
-}
-
-function SummaryDetails({ title, rows }: { title: string; rows: GroupSummary[] }) {
+function SummaryDetails({ title, rows }: { title: string; rows: ReportGroupSummary[] }) {
   return (
     <section className="panel">
       <h2 className="font-semibold">{title}</h2>
@@ -73,38 +60,6 @@ function SummaryDetails({ title, rows }: { title: string; rows: GroupSummary[] }
   )
 }
 
-function AttendanceDonut({ expected, present, late, absent, rate, checkedOut, showCheckedOut }: {
-  expected: number
-  present: number
-  late: number
-  absent: number
-  rate: number
-  checkedOut: number
-  showCheckedOut: boolean
-}) {
-  const segments = [
-    { label: 'Present', value: present, color: '#10b981', text: 'text-emerald-600 dark:text-emerald-400' },
-    { label: 'Late', value: late, color: '#f59e0b', text: 'text-amber-600 dark:text-amber-400' },
-    { label: 'Absent', value: absent, color: '#94a3b8', text: 'text-slate-500 dark:text-slate-400' },
-  ]
-  return (
-    <section className="panel">
-      <div className="flex items-center gap-2"><PieChartIcon size={18} /><h2 className="font-semibold">Attendance overview</h2></div>
-      <div className="mt-4 flex flex-col items-center gap-5 sm:flex-row xl:flex-col">
-        <div className="relative h-48 w-48 shrink-0">
-          <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={segments} dataKey="value" nameKey="label" innerRadius={58} outerRadius={82} paddingAngle={segments.some((segment) => segment.value) ? 2 : 0} stroke="none">{segments.map((segment) => <Cell key={segment.label} fill={segment.color} />)}</Pie><Tooltip contentStyle={{ borderRadius: 12, borderColor: '#cbd5e1' }} formatter={(value, name) => [Number(value).toLocaleString(), name]} /></PieChart></ResponsiveContainer>
-          <div className="absolute inset-0 flex flex-col items-center justify-center"><strong className="text-3xl tracking-tight">{rate}%</strong><span className="text-xs text-slate-500">attendance</span></div>
-        </div>
-        <div className="w-full space-y-2">
-          {segments.map((segment) => <div className="flex items-center justify-between gap-4 text-sm" key={segment.label}><span className={`inline-flex items-center gap-2 font-medium ${segment.text}`}><span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: segment.color }} />{segment.label}</span><strong className="tabular-nums">{segment.value.toLocaleString()}</strong></div>)}
-          <div className="mt-3 flex items-center justify-between border-t border-slate-200 pt-3 text-sm dark:border-slate-700"><span className="text-slate-500">Expected</span><strong>{expected.toLocaleString()}</strong></div>
-          {showCheckedOut && <div className="flex items-center justify-between text-sm"><span className="text-slate-500">Checked out</span><strong>{checkedOut.toLocaleString()}</strong></div>}
-        </div>
-      </div>
-    </section>
-  )
-}
-
 function statusStyle(status: AttendanceReportRow['attendance_status']) {
   if (status === 'present') return 'bg-emerald-100 text-emerald-800'
   if (status === 'late') return 'bg-amber-100 text-amber-800'
@@ -115,7 +70,7 @@ export function ReportsPage() {
   const [searchParams] = useSearchParams()
   const requestedEventId = searchParams.get('event')
   const { profile } = useAuth()
-  const isAdmin = profile?.role === 'super_admin'
+  const canCorrect = profile?.role === 'super_admin' || profile?.role === 'admin'
   const [events, setEvents] = useState<EventRecord[]>([])
   const [students, setStudents] = useState<Student[]>([])
   const [eventId, setEventId] = useState('')
@@ -135,6 +90,8 @@ export function ReportsPage() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
   const [message, setMessage] = useState<{ text: string; tone: 'error' | 'success' | 'info' } | null>(null)
+  const reportRequestRef = useRef(0)
+  const activeEventRequestRef = useRef<string | null>(null)
 
   useEffect(() => {
     let current = true
@@ -151,23 +108,45 @@ export function ReportsPage() {
 
   const refreshReport = useCallback(async (showLoading = false) => {
     if (!eventId) { setRows([]); return }
+    if (!showLoading && activeEventRequestRef.current === eventId) return
+    const requestId = ++reportRequestRef.current
+    activeEventRequestRef.current = eventId
     if (showLoading) setReportLoading(true)
     try {
-      setRows(await getEventAttendanceReport(eventId))
+      const nextRows = await getEventAttendanceReport(eventId)
+      if (requestId !== reportRequestRef.current) return
+      setRows(nextRows)
       setLastUpdated(new Date())
     } catch (cause) {
-      setMessage({ text: friendlyError(cause, 'The attendance report could not be loaded.'), tone: 'error' })
+      if (requestId === reportRequestRef.current) setMessage({ text: friendlyError(cause, 'The attendance report could not be loaded.'), tone: 'error' })
     } finally {
-      if (showLoading) setReportLoading(false)
+      if (requestId === reportRequestRef.current) {
+        activeEventRequestRef.current = null
+        if (showLoading) setReportLoading(false)
+      }
     }
   }, [eventId])
 
   useEffect(() => {
     if (!eventId) return
-    void refreshReport(true)
-    const unsubscribe = subscribeToEventAttendance(eventId, () => { void refreshReport() })
-    const interval = window.setInterval(() => { void refreshReport() }, 15_000)
-    return () => { unsubscribe(); window.clearInterval(interval) }
+    let refreshTimer: number | undefined
+    const scheduleRefresh = (delay = 750, showLoading = false) => {
+      window.clearTimeout(refreshTimer)
+      refreshTimer = window.setTimeout(() => {
+        if (!document.hidden) void refreshReport(showLoading)
+      }, delay)
+    }
+    scheduleRefresh(0, true)
+    const unsubscribe = subscribeToEventAttendance(eventId, () => scheduleRefresh())
+    const interval = window.setInterval(() => scheduleRefresh(0), 30_000)
+    const onVisibilityChange = () => { if (!document.hidden) scheduleRefresh(0) }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    return () => {
+      unsubscribe()
+      window.clearInterval(interval)
+      window.clearTimeout(refreshTimer)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+    }
   }, [eventId, refreshReport])
 
   useEffect(() => { setPage(1) }, [department, eventId, method, search, status, year])
@@ -187,12 +166,14 @@ export function ReportsPage() {
   const pageRows = filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   const summary = useMemo(() => {
-    const expected = rows.filter((row) => row.is_expected).length
-    const present = rows.filter((row) => row.attendance_status === 'present').length
-    const late = rows.filter((row) => row.attendance_status === 'late').length
-    const absent = rows.filter((row) => row.is_expected && row.attendance_status === 'absent').length
-    const checkedOut = rows.filter((row) => !!row.check_out_at).length
-    return { expected, present, late, absent, checkedOut, rate: expected ? Math.min(100, Math.round(((present + late) / expected) * 100)) : 0 }
+    const expectedRows = rows.filter((row) => row.is_expected)
+    const expected = expectedRows.length
+    const present = expectedRows.filter((row) => row.attendance_status === 'present').length
+    const late = expectedRows.filter((row) => row.attendance_status === 'late').length
+    const absent = expectedRows.filter((row) => row.attendance_status === 'absent').length
+    const checkedOut = expectedRows.filter((row) => !!row.check_out_at).length
+    const outsideAudience = rows.filter((row) => !row.is_expected && !!row.check_in_at).length
+    return { expected, present, late, absent, checkedOut, outsideAudience, rate: expected ? Math.round(((present + late) / expected) * 100) : 0 }
   }, [rows])
   const departmentSummary = useMemo(() => groupReport(rows, (row) => row.department_code), [rows])
   const yearSummary = useMemo(() => groupReport(rows, (row) => `Year ${row.year_level}`), [rows])
@@ -247,16 +228,14 @@ export function ReportsPage() {
           {viewMode === 'cards' ? (
             <>
               <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-                {[['Expected', summary.expected], ['Present', summary.present], ['Late', summary.late], ['Absent', summary.absent], ['Attendance', `${summary.rate}%`], ...(eventRecord?.attendance_mode === 'check_in_out' ? [['Checked out', summary.checkedOut]] : [])].map(([label, count]) => <div className="panel p-4" key={label}><div className="text-xs font-medium text-slate-500">{label}</div><div className="mt-1 text-2xl font-bold tabular-nums">{count}</div></div>)}
+                {[['Expected', summary.expected], ['Present', summary.present], ['Late', summary.late], ['Absent', summary.absent], ['Attendance', `${summary.rate}%`], ...(eventRecord?.attendance_mode === 'check_in_out' ? [['Checked out', summary.checkedOut]] : []), ...(summary.outsideAudience > 0 ? [['Outside audience', summary.outsideAudience]] : [])].map(([label, count]) => <div className="panel p-4" key={label}><div className="text-xs font-medium text-slate-500">{label}</div><div className="mt-1 text-2xl font-bold tabular-nums">{count}</div></div>)}
               </section>
               <div className="grid gap-5 lg:grid-cols-2"><SummaryDetails title="Department summary" rows={departmentSummary} /><SummaryDetails title="Year-level summary" rows={yearSummary} /></div>
             </>
           ) : (
-            <div className="grid gap-5 xl:grid-cols-3">
-              <AttendanceDonut {...summary} showCheckedOut={eventRecord?.attendance_mode === 'check_in_out'} />
-              <SummaryChart title="Department summary" rows={departmentSummary} />
-              <SummaryChart title="Year-level summary" rows={yearSummary} />
-            </div>
+            <Suspense fallback={<div className="grid min-h-80 place-items-center rounded-2xl border border-slate-200 bg-white text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900">Loading report graphsâ€¦</div>}>
+              <ReportCharts summary={summary} departmentSummary={departmentSummary} yearSummary={yearSummary} showCheckedOut={eventRecord?.attendance_mode === 'check_in_out'} />
+            </Suspense>
           )}
 
           <section className="panel">
@@ -268,17 +247,17 @@ export function ReportsPage() {
 
           <section className="panel flex flex-wrap gap-3 p-4">
             <SearchInput value={search} onChange={setSearch} placeholder="Search Student ID or name" />
-            <select className="field max-w-44" value={department} onChange={(event) => setDepartment(event.target.value)}><option value="all">All departments</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.code}</option>)}</select>
-            <select className="field max-w-36" value={year} onChange={(event) => setYear(event.target.value)}><option value="all">All years</option>{[1, 2, 3, 4].map((item) => <option key={item} value={item}>Year {item}</option>)}</select>
-            <select className="field max-w-36" value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All statuses</option><option value="present">Present</option><option value="late">Late</option><option value="absent">Absent</option></select>
-            <select className="field max-w-36" value={method} onChange={(event) => setMethod(event.target.value)}><option value="all">All methods</option><option value="qr">QR</option><option value="manual">Manual</option></select>
+            <select aria-label="Filter by department" className="field max-w-44" value={department} onChange={(event) => setDepartment(event.target.value)}><option value="all">All departments</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.code}</option>)}</select>
+            <select aria-label="Filter by year level" className="field max-w-36" value={year} onChange={(event) => setYear(event.target.value)}><option value="all">All years</option>{[1, 2, 3, 4].map((item) => <option key={item} value={item}>Year {item}</option>)}</select>
+            <select aria-label="Filter by attendance status" className="field max-w-36" value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All statuses</option><option value="present">Present</option><option value="late">Late</option><option value="absent">Absent</option></select>
+            <select aria-label="Filter by attendance method" className="field max-w-36" value={method} onChange={(event) => setMethod(event.target.value)}><option value="all">All methods</option><option value="qr">QR</option><option value="manual">Manual</option></select>
           </section>
 
           <div className="table-wrap">
             <table>
               <thead><tr><th>Student</th><th>Department</th><th>Status</th><th>Check-in</th><th>Check-out</th><th>Actions</th></tr></thead>
               <tbody>
-                {pageRows.map((row) => <tr key={row.student_id}><td><div className="font-medium">{row.full_name}</div><div className="text-xs text-slate-500">{row.student_number} · {row.sex}</div>{!row.is_expected && <div className="mt-1 text-xs text-amber-700">Outside current expected list</div>}</td><td>{row.department_code}<div className="text-xs text-slate-500">Year {row.year_level}</div></td><td><span className={`rounded-full px-2 py-1 text-xs font-medium capitalize ${statusStyle(row.attendance_status)}`}>{row.attendance_status}</span></td><td>{row.check_in_at ? <>{formatManilaDate(row.check_in_at)}<div className="text-xs uppercase text-slate-500">{row.check_in_method}</div></> : '—'}</td><td>{row.check_out_at ? <>{formatManilaDate(row.check_out_at)}<div className="text-xs uppercase text-slate-500">{row.check_out_method}</div></> : '—'}</td><td><div className="flex flex-wrap gap-2"><button className="btn-secondary" onClick={() => setHistoryStudent({ id: row.student_id, student_number: row.student_number, full_name: row.full_name })}><History size={14} /> History</button>{isAdmin && <button className="btn-secondary" onClick={() => setEditingRow(row)}><Pencil size={14} /> Correct</button>}</div></td></tr>)}
+                {pageRows.map((row) => <tr key={row.student_id}><td><div className="font-medium">{row.full_name}</div><div className="text-xs text-slate-500">{row.student_number} · {row.sex}</div>{!row.is_expected && <div className="mt-1 text-xs text-amber-700">Outside current expected list</div>}</td><td>{row.department_code}<div className="text-xs text-slate-500">Year {row.year_level}</div></td><td><span className={`rounded-full px-2 py-1 text-xs font-medium capitalize ${statusStyle(row.attendance_status)}`}>{row.attendance_status}</span></td><td>{row.check_in_at ? <>{formatManilaDate(row.check_in_at)}<div className="text-xs uppercase text-slate-500">{row.check_in_method}</div></> : '—'}</td><td>{row.check_out_at ? <>{formatManilaDate(row.check_out_at)}<div className="text-xs uppercase text-slate-500">{row.check_out_method}</div></> : '—'}</td><td><div className="flex flex-wrap gap-2"><button className="btn-secondary" onClick={() => setHistoryStudent({ id: row.student_id, student_number: row.student_number, full_name: row.full_name })}><History size={14} /> History</button>{canCorrect && <button className="btn-secondary" onClick={() => setEditingRow(row)}><Pencil size={14} /> Correct</button>}</div></td></tr>)}
                 {!pageRows.length && <tr><td colSpan={6}><EmptyState compact icon={SearchX} title="No report rows found" description="Try changing the report filters." /></td></tr>}
               </tbody>
             </table>

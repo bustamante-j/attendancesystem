@@ -49,7 +49,7 @@ export async function createQrCardDataUrl(credential: string, details: QrCardDet
 
   context.textAlign = 'center'
   context.textBaseline = 'middle'
-  const brandImage = await loadImage('/branding/attendly-logo.png').catch(() => null)
+  const brandImage = await loadImage('/branding/attendly-logo.webp').catch(() => null)
   if (brandImage) context.drawImage(brandImage, 300, 34, 300, 100)
   else {
     context.fillStyle = '#0f172a'

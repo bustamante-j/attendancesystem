@@ -10,7 +10,7 @@ const schema = z.object({
   full_name: z.string().trim().min(1, 'Full name is required.').max(200),
   username: z.string().trim().regex(/^[A-Za-z0-9_.]{3,40}$/, 'Use 3–40 letters, numbers, underscore, or dot.'),
   password: z.string().max(128),
-  role: z.enum(['super_admin', 'faculty', 'officer']),
+  role: z.enum(['super_admin', 'admin', 'faculty', 'officer']),
 })
 type Values = z.infer<typeof schema>
 
@@ -68,7 +68,7 @@ export function UserFormModal({ user, currentUserId, error, onClose, onSave }: {
           <span className="label">Role</span>
           <select className="field" {...register('role')}>
             <option value="super_admin">Super Admin</option>
-            {!isCurrentUser && <><option value="faculty">Faculty</option><option value="officer">Officer</option></>}
+            {!isCurrentUser && <><option value="admin">Admin</option><option value="faculty">Faculty</option><option value="officer">Officer</option></>}
           </select>
           {isCurrentUser && <span className="mt-1 block text-xs text-slate-500">You cannot remove your own Super Admin role.</span>}
         </label>
