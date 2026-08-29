@@ -58,10 +58,10 @@ export function DashboardPage() {
 
   if (!counts && !error) return <LoadingScreen />
   const cards = [
-    { label: 'Active Students', count: counts?.students ?? 0, icon: Users, color: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300', barColor: 'bg-blue-600' },
-    { label: 'Departments', count: counts?.departments ?? 0, icon: Building2, color: 'bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300', barColor: 'bg-violet-500' },
-    { label: 'Events', count: counts?.events ?? 0, icon: CalendarDays, color: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300', barColor: 'bg-amber-500' },
-    ...(profile?.role === 'super_admin' ? [{ label: 'Staff Users', count: counts?.users ?? 0, icon: UserRoundCog, color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300', barColor: 'bg-emerald-500' }] : []),
+    { label: 'Active Students', count: counts?.students ?? 0, icon: Users, color: 'bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300', barColor: '#2563eb' },
+    { label: 'Departments', count: counts?.departments ?? 0, icon: Building2, color: 'bg-violet-50 text-violet-700 dark:bg-violet-500/10 dark:text-violet-300', barColor: '#8b5cf6' },
+    { label: 'Events', count: counts?.events ?? 0, icon: CalendarDays, color: 'bg-amber-50 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300', barColor: '#f59e0b' },
+    ...(profile?.role === 'super_admin' ? [{ label: 'Staff Users', count: counts?.users ?? 0, icon: UserRoundCog, color: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300', barColor: '#10b981' }] : []),
   ]
   return (
     <div className="space-y-6">

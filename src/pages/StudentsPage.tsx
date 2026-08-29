@@ -1,4 +1,4 @@
-import { FileUp, KeyRound, Pencil, Plus, Printer, RotateCcw, SearchX, Trash2 } from 'lucide-react'
+import { Eye, FileUp, KeyRound, Pencil, Plus, Printer, RotateCcw, SearchX, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert } from '../components/Alert'
 import { useConfirm } from '../components/ConfirmDialog'
@@ -11,7 +11,7 @@ import { StudentFormModal } from '../features/students/StudentFormModal'
 import { StudentImportModal } from '../features/students/StudentImportModal'
 import { friendlyError } from '../lib/errors'
 import { listDepartments } from '../services/departments'
-import { batchIssueStudentQrs, createStudent, issueStudentQr, listStudentQrStatuses, listStudents, restoreStudent, setStudentActive, softDeleteStudent, updateStudent, type StudentInput, type StudentQrStatus } from '../services/students'
+import { batchIssueStudentQrs, createStudent, issueStudentQr, listStudentQrStatuses, listStudents, restoreStudent, setStudentActive, softDeleteStudent, updateStudent, viewStudentQr, type StudentInput, type StudentQrStatus } from '../services/students'
 import type { Department, Student } from '../types/app'
 import { formatManilaDate } from '../utils/dates'
 
@@ -26,7 +26,7 @@ export function StudentsPage() {
   const [qrStatuses, setQrStatuses] = useState<Map<string, StudentQrStatus>>(new Map())
   const [editing, setEditing] = useState<Student | null | undefined>(undefined)
   const [showImport, setShowImport] = useState(false)
-  const [issuedCredentials, setIssuedCredentials] = useState<Array<{ studentId: string; credential: string }> | null>(null)
+  const [qrModal, setQrModal] = useState<{ credentials: Array<{ studentId: string; credential: string }>; mode: 'issued' | 'viewed' } | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
   const [departmentFilter, setDepartmentFilter] = useState('all')
@@ -101,7 +101,7 @@ export function StudentsPage() {
     setBusy(true)
     try {
       const result = await issueStudentQr(student.id)
-      setIssuedCredentials([{ studentId: student.id, credential: result.credential }])
+      setQrModal({ credentials: [{ studentId: student.id, credential: result.credential }], mode: 'issued' })
       await load()
     } catch (cause) { setMessage({ text: friendlyError(cause, 'Credential could not be issued.'), tone: 'error' }) }
     finally { setBusy(false) }
@@ -113,11 +113,24 @@ export function StudentsPage() {
     setBusy(true)
     try {
       const result = await batchIssueStudentQrs(ids)
-      setIssuedCredentials(result.credentials)
+      setQrModal({ credentials: result.credentials, mode: 'issued' })
       setSelected(new Set())
       await load()
     } catch (cause) { setMessage({ text: friendlyError(cause, 'Credential batch could not be issued.'), tone: 'error' }) }
     finally { setBusy(false) }
+  }
+
+  const viewQr = async (student: Student) => {
+    setBusy(true)
+    setMessage(null)
+    try {
+      const result = await viewStudentQr(student.id)
+      setQrModal({ credentials: [{ studentId: student.id, credential: result.credential }], mode: 'viewed' })
+    } catch (cause) {
+      setMessage({ text: friendlyError(cause, 'The QR credential could not be viewed.'), tone: 'error' })
+    } finally {
+      setBusy(false)
+    }
   }
 
   const selectablePageRows = pageRows.filter((student) => !student.deleted_at)
@@ -157,7 +170,7 @@ export function StudentsPage() {
                 <td className="font-mono">{student.student_number}</td><td className="font-medium">{student.full_name}</td><td>{student.year_level}</td><td>{student.sex}</td><td>{student.departments?.code ?? '—'}</td>
                 <td>{student.deleted_at ? <span className="rounded-full bg-red-100 px-2 py-1 text-xs text-red-800">Deleted</span> : <span className={`rounded-full px-2 py-1 text-xs ${student.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}`}>{student.is_active ? 'Active' : 'Inactive'}</span>}</td>
                 {isAdmin && <td>{student.deleted_at ? '—' : qr?.has_active_credential ? <div><span className="text-sm text-emerald-700">Issued</span>{qr.issued_at && <div className="text-xs text-slate-500">{formatManilaDate(qr.issued_at)}</div>}</div> : <span className="text-sm text-slate-500">Not issued</span>}</td>}
-                {isAdmin && <td><div className="flex flex-wrap gap-2">{student.deleted_at ? <button className="btn-secondary" onClick={() => void restore(student)}><RotateCcw size={14} /> Restore</button> : <><button className="btn-secondary" onClick={() => setEditing(student)}><Pencil size={14} /> Edit</button><button className="btn-secondary" onClick={() => void toggleActive(student)}>{student.is_active ? 'Deactivate' : 'Activate'}</button><button className="btn-secondary" disabled={busy} onClick={() => void issueOne(student)}>{qr?.has_active_credential ? <RotateCcw size={14} /> : <KeyRound size={14} />}{qr?.has_active_credential ? 'Regenerate QR' : 'Issue QR'}</button><button className="btn-danger" onClick={() => void remove(student)}><Trash2 size={14} /></button></>}</div></td>}
+                {isAdmin && <td><div className="flex flex-wrap gap-2">{student.deleted_at ? <button className="btn-secondary" onClick={() => void restore(student)}><RotateCcw size={14} /> Restore</button> : <><button className="btn-secondary" onClick={() => setEditing(student)}><Pencil size={14} /> Edit</button><button className="btn-secondary" onClick={() => void toggleActive(student)}>{student.is_active ? 'Deactivate' : 'Activate'}</button>{qr?.has_active_credential && <button className="btn-primary" disabled={busy} onClick={() => void viewQr(student)}><Eye size={14} /> View QR</button>}<button className="btn-secondary" disabled={busy} onClick={() => void issueOne(student)}>{qr?.has_active_credential ? <RotateCcw size={14} /> : <KeyRound size={14} />}{qr?.has_active_credential ? 'Regenerate QR' : 'Issue QR'}</button><button className="btn-danger" onClick={() => void remove(student)} aria-label={`Delete ${student.full_name}`}><Trash2 size={14} /></button></>}</div></td>}
               </tr>
             })}
             {!pageRows.length && <tr><td colSpan={isAdmin ? 10 : 6}><EmptyState compact icon={SearchX} title="No students found" description="Try changing the search or filters." /></td></tr>}
@@ -167,7 +180,7 @@ export function StudentsPage() {
       <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600"><span>Showing {filtered.length ? (page - 1) * PAGE_SIZE + 1 : 0}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}</span><div className="flex items-center gap-2"><button className="btn-secondary" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</button><span>Page {page} of {pageCount}</span><button className="btn-secondary" disabled={page >= pageCount} onClick={() => setPage((value) => value + 1)}>Next</button></div></div>
       {editing !== undefined && <StudentFormModal student={editing} departments={departments} error={message?.tone === 'error' ? message.text : null} onClose={() => setEditing(undefined)} onSave={save} />}
       {showImport && <StudentImportModal departments={departments} onClose={() => setShowImport(false)} onImported={load} />}
-      {issuedCredentials && <QrCredentialModal students={students} credentials={issuedCredentials} onClose={() => setIssuedCredentials(null)} />}
+      {qrModal && <QrCredentialModal students={students} credentials={qrModal.credentials} mode={qrModal.mode} onClose={() => setQrModal(null)} />}
     </div>
   )
 }

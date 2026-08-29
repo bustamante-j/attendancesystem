@@ -1,4 +1,5 @@
 import { corsHeaders, errorResponse, jsonResponse, requireActor } from '../_shared/http.ts'
+import { encryptQrCredential } from '../_shared/qr-escrow.ts'
 
 function base64Url(bytes: Uint8Array) {
   let binary = ''
@@ -27,25 +28,28 @@ Deno.serve(async (request) => {
 
     const credentials = await Promise.all(studentIds.map(async (studentId: string) => {
       const credential = `ATTENDLY_${base64Url(crypto.getRandomValues(new Uint8Array(32)))}`
+      const encrypted = await encryptQrCredential(credential)
       return {
         student_id: studentId,
         credential,
         token_hash: await sha256Hex(credential),
         token_prefix: credential.slice(0, 12),
+        encrypted_token: encrypted.encryptedToken,
+        encryption_iv: encrypted.encryptionIv,
       }
     }))
 
-    const { error } = await admin.rpc('batch_issue_student_qr_secure', {
+    const { error } = await admin.rpc('batch_issue_student_qr_with_escrow_secure', {
       p_actor_id: actor.id,
-      p_credentials: credentials.map(({ student_id, token_hash, token_prefix }) => ({
-        student_id, token_hash, token_prefix,
+      p_credentials: credentials.map(({ student_id, token_hash, token_prefix, encrypted_token, encryption_iv }) => ({
+        student_id, token_hash, token_prefix, encrypted_token, encryption_iv,
       })),
     })
     if (error) throw new Error('The credential batch could not be issued. No credentials were changed.')
 
     return jsonResponse({
       credentials: credentials.map(({ student_id, credential }) => ({ studentId: student_id, credential })),
-      warning: 'These credentials are shown once. Print or download them now.',
+      warning: 'These credentials can be securely viewed again by a Super Admin.',
     })
   } catch (error) {
     return errorResponse(error)

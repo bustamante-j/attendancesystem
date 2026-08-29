@@ -38,6 +38,9 @@ The starter department is Information Technology (`IT`), and events and students
 - Mobile scanner controls, framing guidance, and immediate scan feedback optimized for one-handed use
 - Attendly logo branding across navigation, sign-in, and downloadable student QR cards
 - Switchable card and graph views for dashboard totals and report analytics
+- Recharts-powered responsive charts with tooltips, axes, legends, stacked breakdowns, and attendance composition
+- Simplified event scheduling with Standard, Strict, and Advanced attendance-window presets
+- Audited Super Admin QR viewing with server-only AES-GCM encryption for newly issued credentials
 
 Iteration 5 intentionally does not include PWA installation or offline support; those remain part of the final deployment iteration.
 
@@ -102,6 +105,15 @@ npx supabase functions deploy create-event --use-api
 npx supabase functions deploy reset-event-pin --use-api
 npx supabase functions deploy batch-issue-student-qrs --use-api
 npx supabase functions deploy update-user --use-api
+npx supabase functions deploy view-student-qr --use-api
+```
+
+Before deploying the QR functions, generate the QR escrow key locally, set it once, and remove it from the terminal session:
+
+```powershell
+$qrEscrowKey = node -e "process.stdout.write(require('crypto').randomBytes(32).toString('base64url'))"
+npx supabase secrets set "QR_ESCROW_KEY=$qrEscrowKey"
+Remove-Variable qrEscrowKey
 ```
 
 `supabase/config.toml` disables public signup for CLI-managed configuration. Confirm in the hosted project's Auth settings that public user signup is disabled before production use. Do not create tables manually in the dashboard; `supabase db push` applies the versioned migrations and seeds `IT`.
@@ -204,6 +216,12 @@ Migration `202608280005_iteration_4_reporting.sql` adds:
 - expected/attended student reconciliation that preserves historical attendance rows
 - audited Super Admin attendance removal for correcting an erroneous record back to absent
 
+Migration `202608290001_pre_iteration_6_upgrades.sql` adds:
+
+- AES-GCM QR retrieval ciphertext fields that remain inaccessible to browser roles
+- atomic single and batch QR issuance functions that store the encrypted retrieval copy with the credential hash
+- automatic encrypted-copy scrubbing whenever a QR credential is revoked
+
 All important timestamps use `timestamptz`. Attendance timestamps come from PostgreSQL `now()` and never from the scanner client. Absence is derived from expected students minus attendance rows. Check-out updates the original attendance row. Critical historical foreign keys use `ON DELETE RESTRICT`, and normal student/event/department deletion is soft deletion.
 
 ## Security model
@@ -242,6 +260,7 @@ The development scan page is guarded by Super Admin authorization and `import.me
 - CSV and `.xlsx` student imports are supported; legacy `.xls` files must first be saved as `.xlsx` or CSV
 - Reports export `.xlsx`; PDF report export is not included
 - Attendance history derives eligibility from the student's current department/year because historical profile versions are not stored
+- QR credentials issued before version 0.5.2 must be regenerated once before secure viewing is available
 - The in-app browser was unavailable during Iteration 5, so final cross-device visual acceptance should be completed on real desktop and mobile devices
 - No PWA installation or offline mode yet
 

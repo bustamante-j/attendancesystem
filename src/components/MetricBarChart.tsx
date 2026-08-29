@@ -1,4 +1,5 @@
 import { BarChart3 } from 'lucide-react'
+import { Bar, BarChart, CartesianGrid, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 
 export interface MetricBarItem {
   label: string
@@ -11,26 +12,22 @@ export function MetricBarChart({ title, description, items }: {
   description?: string
   items: MetricBarItem[]
 }) {
-  const maximum = Math.max(...items.map((item) => item.value), 1)
-
   return (
     <section className="panel" aria-label={title}>
       <div className="flex items-start gap-3">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-blue-50 text-blue-700 dark:bg-blue-500/10 dark:text-blue-300"><BarChart3 size={20} /></span>
         <div><h2 className="font-semibold">{title}</h2>{description && <p className="mt-1 text-sm text-slate-500">{description}</p>}</div>
       </div>
-      <div className="mt-6 space-y-4">
-        {items.map((item) => {
-          const width = item.value ? Math.max(3, (item.value / maximum) * 100) : 0
-          return (
-            <div key={item.label}>
-              <div className="mb-1.5 flex items-center justify-between gap-4 text-sm"><span className="font-medium text-slate-700 dark:text-slate-300">{item.label}</span><span className="font-bold tabular-nums">{item.value.toLocaleString()}</span></div>
-              <div className="h-3 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
-                <div className={`h-full rounded-full transition-[width] duration-500 ${item.color ?? 'bg-blue-600'}`} style={{ width: `${width}%` }} />
-              </div>
-            </div>
-          )
-        })}
+      <div className="mt-5 h-72 w-full min-w-0" role="img" aria-label={items.map((item) => `${item.label}: ${item.value}`).join(', ')}>
+        <ResponsiveContainer width="100%" height="100%">
+          <BarChart data={items} margin={{ top: 8, right: 12, left: 0, bottom: 8 }}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#cbd5e1" strokeOpacity={0.55} />
+            <XAxis dataKey="label" tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} />
+            <YAxis allowDecimals={false} tick={{ fill: '#64748b', fontSize: 12 }} axisLine={false} tickLine={false} width={42} />
+            <Tooltip cursor={{ fill: '#dbeafe', opacity: 0.35 }} contentStyle={{ borderRadius: 12, borderColor: '#cbd5e1', boxShadow: '0 10px 30px rgba(15,23,42,0.12)' }} formatter={(value) => [Number(value).toLocaleString(), 'Total']} />
+            <Bar dataKey="value" name="Total" fill="#2563eb" radius={[8, 8, 0, 0]} maxBarSize={72}>{items.map((item) => <Cell key={item.label} fill={item.color ?? '#2563eb'} />)}</Bar>
+          </BarChart>
+        </ResponsiveContainer>
       </div>
     </section>
   )

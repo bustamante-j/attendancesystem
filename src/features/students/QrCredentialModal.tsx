@@ -7,7 +7,7 @@ import { createQrCardDataUrl, downloadDataUrl } from './qr'
 interface IssuedCredential { studentId: string; credential: string }
 interface QrCard { student: Student; dataUrl: string }
 
-export function QrCredentialModal({ students, credentials, onClose }: { students: Student[]; credentials: IssuedCredential[]; onClose: () => void }) {
+export function QrCredentialModal({ students, credentials, mode, onClose }: { students: Student[]; credentials: IssuedCredential[]; mode: 'issued' | 'viewed'; onClose: () => void }) {
   const [cards, setCards] = useState<QrCard[]>([])
   const [error, setError] = useState<string | null>(null)
   const studentMap = useMemo(() => new Map(students.map((student) => [student.id, student])), [students])
@@ -32,9 +32,9 @@ export function QrCredentialModal({ students, credentials, onClose }: { students
   }, [credentials, studentMap])
 
   return (
-    <Modal title={credentials.length > 1 ? `Issued ${credentials.length} QR credentials` : 'QR credential issued'} onClose={onClose} size="full">
-      <div className="no-print mb-5 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
-        These credentials are shown once. Download or print them before closing this window. Issuing again revokes the current credential.
+    <Modal title={mode === 'viewed' ? 'View student QR credential' : credentials.length > 1 ? `Issued ${credentials.length} QR credentials` : 'QR credential issued'} onClose={onClose} size="full">
+      <div className="no-print mb-5 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900 dark:border-blue-800 dark:bg-blue-950/50 dark:text-blue-200">
+        {mode === 'viewed' ? 'This is the student’s active credential. You can download or print it again.' : 'The new credential is active and can be securely viewed again by a Super Admin. Regenerating it will revoke this copy.'}
       </div>
       {error && <div className="no-print mb-5 rounded-lg bg-red-50 p-4 text-red-800">{error}</div>}
       <div className="no-print mb-5 flex flex-wrap gap-3">

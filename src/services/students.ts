@@ -61,6 +61,12 @@ export async function issueStudentQr(studentId: string) {
   })
 }
 
+export async function viewStudentQr(studentId: string) {
+  return invokeFunction<{ credential: string; issuedAt: string }>('view-student-qr', {
+    student_id: studentId,
+  })
+}
+
 export interface StudentQrStatus {
   student_id: string
   has_active_credential: boolean

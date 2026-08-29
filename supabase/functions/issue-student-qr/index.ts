@@ -1,4 +1,5 @@
 import { corsHeaders, errorResponse, jsonResponse, requireActor } from '../_shared/http.ts'
+import { encryptQrCredential } from '../_shared/qr-escrow.ts'
 
 function base64Url(bytes: Uint8Array) {
   let binary = ''
@@ -24,18 +25,21 @@ Deno.serve(async (request) => {
     const randomBytes = crypto.getRandomValues(new Uint8Array(32))
     const credential = `ATTENDLY_${base64Url(randomBytes)}`
     const tokenHash = await sha256Hex(credential)
-    const { data: credentialId, error } = await admin.rpc('issue_student_qr_secure', {
+    const encrypted = await encryptQrCredential(credential)
+    const { data: credentialId, error } = await admin.rpc('issue_student_qr_with_escrow_secure', {
       p_actor_id: actor.id,
       p_student_id: studentId,
       p_token_hash: tokenHash,
       p_token_prefix: credential.slice(0, 12),
+      p_encrypted_token: encrypted.encryptedToken,
+      p_encryption_iv: encrypted.encryptionIv,
     })
     if (error) throw new Error(error.code === 'P0002' ? 'Student not found.' : 'The QR credential could not be issued.')
 
     return jsonResponse({
       credentialId,
       credential,
-      warning: 'Store or render this credential now. It cannot be retrieved again.',
+      warning: 'This credential can be securely viewed again by a Super Admin.',
     })
   } catch (error) {
     return errorResponse(error)

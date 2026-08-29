@@ -1,6 +1,7 @@
-import { BarChart3, Download, History, Pencil, PieChart, Radio, RefreshCw, Search, SearchX } from 'lucide-react'
+import { BarChart3, Download, History, Pencil, PieChart as PieChartIcon, Radio, RefreshCw, Search, SearchX } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { Alert } from '../components/Alert'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingScreen } from '../components/LoadingScreen'
@@ -46,22 +47,7 @@ function SummaryChart({ title, rows }: { title: string; rows: GroupSummary[] }) 
   return (
     <section className="panel">
       <div className="flex items-center gap-2"><BarChart3 size={18} /><h2 className="font-semibold">{title}</h2></div>
-      <div className="mt-4 space-y-4">
-        {rows.map((row) => {
-          const total = Math.max(row.expected, row.present + row.late + row.absent, 1)
-          return (
-            <div key={row.label}>
-              <div className="mb-1 flex items-center justify-between gap-3 text-sm"><span className="font-medium">{row.label}</span><span className="text-xs text-slate-500">{row.present} present · {row.late} late · {row.absent} absent</span></div>
-              <div className="flex h-3 overflow-hidden rounded-full bg-slate-200" aria-label={`${row.label}: ${row.present} present, ${row.late} late, ${row.absent} absent`}>
-                <div className="bg-emerald-500" style={{ width: `${(row.present / total) * 100}%` }} />
-                <div className="bg-amber-500" style={{ width: `${(row.late / total) * 100}%` }} />
-                <div className="bg-slate-400" style={{ width: `${(row.absent / total) * 100}%` }} />
-              </div>
-            </div>
-          )
-        })}
-        {!rows.length && <p className="py-4 text-center text-sm text-slate-500">No summary data.</p>}
-      </div>
+      {rows.length ? <div className="mt-4 h-72 min-w-0" role="img" aria-label={`${title} attendance graph`}><ResponsiveContainer width="100%" height="100%"><BarChart data={rows} layout="vertical" margin={{ top: 8, right: 8, left: 4, bottom: 0 }}><CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#cbd5e1" strokeOpacity={0.55} /><XAxis type="number" allowDecimals={false} tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} /><YAxis type="category" dataKey="label" width={66} tick={{ fill: '#64748b', fontSize: 11 }} axisLine={false} tickLine={false} /><Tooltip contentStyle={{ borderRadius: 12, borderColor: '#cbd5e1', boxShadow: '0 10px 30px rgba(15,23,42,0.12)' }} /><Legend iconType="circle" wrapperStyle={{ fontSize: 12 }} /><Bar dataKey="present" name="Present" stackId="attendance" fill="#10b981" radius={[5, 0, 0, 5]} /><Bar dataKey="late" name="Late" stackId="attendance" fill="#f59e0b" /><Bar dataKey="absent" name="Absent" stackId="attendance" fill="#94a3b8" radius={[0, 5, 5, 0]} /></BarChart></ResponsiveContainer></div> : <p className="py-8 text-center text-sm text-slate-500">No summary data.</p>}
     </section>
   )
 }
@@ -96,30 +82,17 @@ function AttendanceDonut({ expected, present, late, absent, rate, checkedOut, sh
   checkedOut: number
   showCheckedOut: boolean
 }) {
-  const radius = 52
-  const circumference = 2 * Math.PI * radius
-  const total = Math.max(present + late + absent, 1)
   const segments = [
     { label: 'Present', value: present, color: '#10b981', text: 'text-emerald-600 dark:text-emerald-400' },
     { label: 'Late', value: late, color: '#f59e0b', text: 'text-amber-600 dark:text-amber-400' },
     { label: 'Absent', value: absent, color: '#94a3b8', text: 'text-slate-500 dark:text-slate-400' },
   ]
-  let offset = 0
-
   return (
     <section className="panel">
-      <div className="flex items-center gap-2"><PieChart size={18} /><h2 className="font-semibold">Attendance overview</h2></div>
+      <div className="flex items-center gap-2"><PieChartIcon size={18} /><h2 className="font-semibold">Attendance overview</h2></div>
       <div className="mt-4 flex flex-col items-center gap-5 sm:flex-row xl:flex-col">
         <div className="relative h-48 w-48 shrink-0">
-          <svg className="h-full w-full" viewBox="0 0 128 128" role="img" aria-label={`${rate}% attendance: ${present} present, ${late} late, ${absent} absent`}>
-            <circle cx="64" cy="64" r={radius} fill="none" stroke="currentColor" strokeWidth="14" className="text-slate-100 dark:text-slate-800" />
-            {segments.map((segment) => {
-              const length = (segment.value / total) * circumference
-              const dashOffset = -offset
-              offset += length
-              return <circle key={segment.label} cx="64" cy="64" r={radius} fill="none" stroke={segment.color} strokeWidth="14" strokeDasharray={`${length} ${circumference - length}`} strokeDashoffset={dashOffset} transform="rotate(-90 64 64)" />
-            })}
-          </svg>
+          <ResponsiveContainer width="100%" height="100%"><PieChart><Pie data={segments} dataKey="value" nameKey="label" innerRadius={58} outerRadius={82} paddingAngle={segments.some((segment) => segment.value) ? 2 : 0} stroke="none">{segments.map((segment) => <Cell key={segment.label} fill={segment.color} />)}</Pie><Tooltip contentStyle={{ borderRadius: 12, borderColor: '#cbd5e1' }} formatter={(value, name) => [Number(value).toLocaleString(), name]} /></PieChart></ResponsiveContainer>
           <div className="absolute inset-0 flex flex-col items-center justify-center"><strong className="text-3xl tracking-tight">{rate}%</strong><span className="text-xs text-slate-500">attendance</span></div>
         </div>
         <div className="w-full space-y-2">
