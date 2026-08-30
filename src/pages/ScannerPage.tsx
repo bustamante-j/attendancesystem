@@ -36,6 +36,11 @@ interface RecentScan {
   recordedAt: Date
 }
 
+interface AttendancePopup {
+  result: AttendanceResult
+  method: 'qr' | 'manual'
+}
+
 function resultTone(code: string): ScanFeedbackTone {
   if (code === 'success_present' || code === 'success_checkout' || code === 'undo_success') return 'success'
   if (code === 'success_late' || code.startsWith('already_')) return 'warning'
@@ -67,6 +72,7 @@ export function ScannerPage() {
   const [cameraError, setCameraError] = useState<string | null>(null)
   const [processing, setProcessing] = useState(false)
   const [result, setResult] = useState<AttendanceResult | null>(null)
+  const [scanPopup, setScanPopup] = useState<AttendancePopup | null>(null)
   const [recentScans, setRecentScans] = useState<RecentScan[]>([])
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -134,9 +140,16 @@ export function ScannerPage() {
     return () => document.removeEventListener('visibilitychange', stopWhenHidden)
   }, [])
 
+  useEffect(() => {
+    if (!scanPopup) return
+    const timeout = window.setTimeout(() => setScanPopup(null), 3_000)
+    return () => window.clearTimeout(timeout)
+  }, [scanPopup])
+
   const handleAttendanceResult = useCallback(async (nextResult: AttendanceResult, method: 'qr' | 'manual') => {
     const tone = resultTone(nextResult.code)
     setResult(nextResult)
+    if (nextResult.student) setScanPopup({ result: nextResult, method })
     setRecentScans((current) => [{
       id: crypto.randomUUID(),
       result: nextResult,
@@ -262,6 +275,36 @@ export function ScannerPage() {
         </section>
       ) : (
         <>
+          {scanPopup?.result.student && (
+            <div className="pointer-events-none fixed inset-x-3 top-20 z-[70] flex justify-center" aria-live="assertive" aria-atomic="true">
+              <div className={`w-full max-w-md rounded-2xl border p-4 shadow-2xl backdrop-blur ${resultStyles(resultTone(scanPopup.result.code))}`} role="status">
+                <div className="flex items-center gap-3">
+                  <ResultIcon tone={resultTone(scanPopup.result.code)} />
+                  <div className="min-w-0">
+                    <div className="text-xs font-bold uppercase tracking-wider opacity-70">{scanPopup.method === 'qr' ? 'QR scan recorded' : 'Manual attendance recorded'}</div>
+                    <div className="truncate text-lg font-bold">{scanPopup.result.student.fullName}</div>
+                    <div className="font-mono text-sm font-semibold">Student ID: {scanPopup.result.student.studentNumber}</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          <section className="panel p-2 sm:p-5" aria-labelledby="qr-scanner-title">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1 sm:px-0">
+              <div><h2 className="font-semibold" id="qr-scanner-title">QR scanner</h2><p className="mt-1 text-xs text-slate-500">Place the student QR inside the frame.</p></div>
+              <span className="status-chip bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">{direction === 'check_in' ? 'Checking in' : 'Checking out'}</span>
+            </div>
+            <ScannerCamera enabled={cameraActive} processing={processing} onDecode={processCredential} onError={handleCameraError} />
+            {cameraError && <div className="mt-3"><Alert message={cameraError} /></div>}
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs text-slate-500">Use HTTPS and allow camera permission. Scans have a 3-second repeat cooldown.</p>
+              {cameraActive
+                ? <button className="btn-secondary w-full sm:w-auto" onClick={() => setCameraActive(false)}><CameraOff size={17} /> Stop camera</button>
+                : <button className="btn-primary w-full sm:w-auto" onClick={() => void startCamera()}><Camera size={17} /> Start camera</button>}
+            </div>
+          </section>
+
           <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6" aria-label="Live attendance counts">
             {summaryCards.map(([label, count]) => (
               <div className="panel p-3.5 sm:p-4" key={label}>
@@ -284,60 +327,43 @@ export function ScannerPage() {
             </div>
           </section>
 
-          <div className="grid gap-5 lg:grid-cols-[minmax(0,1.5fr)_minmax(300px,0.8fr)]">
-            <section className="panel p-2 sm:p-5">
-              <ScannerCamera enabled={cameraActive} processing={processing} onDecode={processCredential} onError={handleCameraError} />
-              {cameraError && <div className="mt-3"><Alert message={cameraError} /></div>}
-              {result && currentTone && (
-                <div className={`mt-3 rounded-xl border p-3 lg:hidden ${resultStyles(currentTone)}`} aria-live="assertive" aria-atomic="true">
-                  <div className="flex items-start gap-3"><ResultIcon tone={currentTone} /><div className="min-w-0"><div className="font-semibold">{result.student?.fullName ?? 'Scan result'}</div>{result.student && <div className="text-sm opacity-80">{result.student.studentNumber}</div>}<p className="mt-1 text-sm">{result.message}</p></div></div>
+          <div className="grid gap-5 lg:grid-cols-2">
+            <section className="panel min-h-40" aria-live="polite" aria-atomic="true">
+              <div className="flex items-center gap-2"><ScanLine size={18} /><h2 className="font-semibold">Latest result</h2></div>
+              {!result || !currentTone ? (
+                <div className="flex min-h-28 flex-col items-center justify-center text-center text-slate-500">
+                  <ScanLine size={30} />
+                  <p className="mt-2 text-sm">The latest scan result will appear here.</p>
+                </div>
+              ) : (
+                <div className={`mt-3 rounded-lg border p-4 ${resultStyles(currentTone)}`}>
+                  <div className="flex items-start gap-3">
+                    <ResultIcon tone={currentTone} />
+                    <div className="min-w-0">
+                      <div className="font-semibold">{result.student?.fullName ?? 'Scan result'}</div>
+                      {result.student && <div className="text-sm opacity-80">{result.student.studentNumber}</div>}
+                      <p className="mt-2 text-sm">{result.message}</p>
+                    </div>
+                  </div>
                 </div>
               )}
-              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-xs text-slate-500">Use HTTPS and allow camera permission. Scans have a 3-second repeat cooldown.</p>
-                {cameraActive
-                  ? <button className="btn-secondary w-full sm:w-auto" onClick={() => setCameraActive(false)}><CameraOff size={17} /> Stop camera</button>
-                  : <button className="btn-primary w-full sm:w-auto" onClick={() => void startCamera()}><Camera size={17} /> Start camera</button>}
-              </div>
             </section>
 
-            <div className="space-y-5">
-              <section className="panel hidden min-h-40 lg:block" aria-live="assertive" aria-atomic="true">
-                {!result || !currentTone ? (
-                  <div className="flex min-h-28 flex-col items-center justify-center text-center text-slate-500">
-                    <ScanLine size={30} />
-                    <p className="mt-2 text-sm">The latest scan result will appear here.</p>
-                  </div>
-                ) : (
-                  <div className={`rounded-lg border p-4 ${resultStyles(currentTone)}`}>
-                    <div className="flex items-start gap-3">
-                      <ResultIcon tone={currentTone} />
-                      <div className="min-w-0">
-                        <div className="font-semibold">{result.student?.fullName ?? 'Scan result'}</div>
-                        {result.student && <div className="text-sm opacity-80">{result.student.studentNumber}</div>}
-                        <p className="mt-2 text-sm">{result.message}</p>
-                      </div>
+            <section className="panel">
+              <div className="flex items-center gap-2"><Clock3 size={18} /><h2 className="font-semibold">Recent activity</h2></div>
+              <div className="mt-3 divide-y">
+                {recentScans.map((scan) => (
+                  <div className="py-3 first:pt-0 last:pb-0" key={scan.id}>
+                    <div className="flex items-center justify-between gap-3">
+                      <span className="truncate text-sm font-medium">{scan.result.student?.fullName ?? scan.result.message}</span>
+                      <span className="shrink-0 text-xs text-slate-500">{scan.recordedAt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
                     </div>
+                    <div className="mt-1 text-xs text-slate-500">{scan.method === 'qr' ? 'QR' : 'Manual'} · {scan.result.code.replaceAll('_', ' ')}</div>
                   </div>
-                )}
-              </section>
-
-              <section className="panel">
-                <div className="flex items-center gap-2"><Clock3 size={18} /><h2 className="font-semibold">Recent activity</h2></div>
-                <div className="mt-3 divide-y">
-                  {recentScans.map((scan) => (
-                    <div className="py-3 first:pt-0 last:pb-0" key={scan.id}>
-                      <div className="flex items-center justify-between gap-3">
-                        <span className="truncate text-sm font-medium">{scan.result.student?.fullName ?? scan.result.message}</span>
-                        <span className="shrink-0 text-xs text-slate-500">{scan.recordedAt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-                      </div>
-                      <div className="mt-1 text-xs text-slate-500">{scan.method === 'qr' ? 'QR' : 'Manual'} · {scan.result.code.replaceAll('_', ' ')}</div>
-                    </div>
-                  ))}
-                  {!recentScans.length && <p className="py-5 text-center text-sm text-slate-500">No scans in this session.</p>}
-                </div>
-              </section>
-            </div>
+                ))}
+                {!recentScans.length && <p className="py-5 text-center text-sm text-slate-500">No scans in this session.</p>}
+              </div>
+            </section>
           </div>
 
           <ManualAttendancePanel eventId={eventId} direction={direction} onResult={handleAttendanceResult} />
