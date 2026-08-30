@@ -3,6 +3,7 @@ import { CalendarClock, Clock3, MapPin, Users } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
+import { Alert } from '../../components/Alert'
 import { Modal } from '../../components/Modal'
 import type { EventInput } from '../../services/events'
 import type { Department, EventRecord } from '../../types/app'
@@ -20,8 +21,15 @@ const schema = z.object({
   attendance_mode: z.enum(['check_in_only', 'check_in_out']),
   check_out_opens_at: z.string(),
   check_out_closes_at: z.string(),
-  department_ids: z.array(z.string().uuid()).min(1, 'Select at least one department.'),
-  year_levels: z.array(z.number().int().min(1).max(4)),
+  department_ids: z.union([
+    z.string().uuid(),
+    z.array(z.string().uuid()).min(1, 'Select at least one department.'),
+  ]),
+  year_levels: z.union([
+    z.literal(0),
+    z.number().int().min(1).max(4),
+    z.array(z.number().int().min(1).max(4)),
+  ]),
 }).superRefine((values, context) => {
   const parse = (value: string) => { try { return new Date(manilaDateTimeToIso(value)).getTime() } catch { return Number.NaN } }
   const start = parse(values.start_at)
@@ -42,9 +50,9 @@ const schema = z.object({
 type Values = z.infer<typeof schema>
 type TimingPreset = 'standard' | 'strict' | 'custom'
 
-function defaults(event: EventRecord | null, audience: { departmentIds: string[]; yearLevels: number[] } | null, departmentId: string): Values {
+function defaults(event: EventRecord | null, audience: { departmentIds: string[]; yearLevels: number[] } | null, departmentId: string, duplicate: boolean): Values {
   if (event) return {
-    name: event.name,
+    name: duplicate ? `Copy of ${event.name}` : event.name,
     description: event.description ?? '',
     venue: event.venue ?? '',
     start_at: toDateTimeLocal(event.start_at),
@@ -109,21 +117,36 @@ function SplitDateTimeField({ label, value, onChange, error }: {
   )
 }
 
-export function EventFormModal({ event, audience, departments, onClose, onSave }: {
+export function EventFormModal({ event, audience, departments, duplicate = false, onClose, onSave }: {
   event: EventRecord | null
   audience: { departmentIds: string[]; yearLevels: number[] } | null
   departments: Department[]
+  duplicate?: boolean
   onClose: () => void
   onSave: (input: EventInput) => Promise<void>
 }) {
   const [timingPreset, setTimingPreset] = useState<TimingPreset>(event ? 'custom' : 'standard')
   const { control, register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<Values>({
     resolver: zodResolver(schema),
-    defaultValues: defaults(event, audience, departments[0]?.id ?? ''),
+    defaultValues: defaults(event, audience, departments[0]?.id ?? '', duplicate),
   })
   const mode = watch('attendance_mode')
   const startAt = watch('start_at')
   const endAt = watch('end_at')
+  const validationMessages = [
+    errors.name?.message,
+    errors.description?.message,
+    errors.venue?.message,
+    errors.start_at?.message,
+    errors.end_at?.message,
+    errors.check_in_opens_at?.message,
+    errors.late_after?.message,
+    errors.check_in_closes_at?.message,
+    errors.check_out_opens_at?.message,
+    errors.check_out_closes_at?.message,
+    errors.department_ids?.message,
+    errors.year_levels?.message,
+  ].filter((message): message is string => typeof message === 'string')
 
   useEffect(() => {
     if (timingPreset === 'custom') return
@@ -149,11 +172,14 @@ export function EventFormModal({ event, audience, departments, onClose, onSave }
     check_in_closes_at: manilaDateTimeToIso(values.check_in_closes_at),
     check_out_opens_at: values.attendance_mode === 'check_in_out' ? manilaDateTimeToIso(values.check_out_opens_at) : null,
     check_out_closes_at: values.attendance_mode === 'check_in_out' ? manilaDateTimeToIso(values.check_out_closes_at) : null,
+    department_ids: Array.isArray(values.department_ids) ? values.department_ids : [values.department_ids],
+    year_levels: (Array.isArray(values.year_levels) ? values.year_levels : [values.year_levels]).filter((year) => year >= 1),
   })
 
   return (
-    <Modal title={event ? 'Edit event' : 'Create event'} onClose={onClose} size="lg" closeDisabled={isSubmitting}>
+    <Modal title={duplicate ? 'Duplicate event' : event ? 'Edit event' : 'Create event'} onClose={onClose} size="lg" closeDisabled={isSubmitting}>
       <form className="space-y-5" onSubmit={handleSubmit(submit)}>
+        {!!validationMessages.length && <Alert message={`Review the event details: ${validationMessages.join(' ')}`} />}
         <section className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
           <div className="mb-4 flex items-center gap-2"><MapPin size={18} className="text-blue-600" /><h3 className="font-semibold">Event details</h3></div>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -201,7 +227,7 @@ export function EventFormModal({ event, audience, departments, onClose, onSave }
           <fieldset className="mt-4"><legend className="label">Year levels <span className="font-normal text-slate-500">(none means all)</span></legend><div className="flex flex-wrap gap-3">{[1, 2, 3, 4].map((year) => <label key={year} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 px-3 text-sm transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"><input type="checkbox" value={year} {...register('year_levels', { valueAsNumber: true })} /> Year {year}</label>)}</div></fieldset>
         </section>
 
-        <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white/95 pt-4 backdrop-blur dark:border-slate-700 dark:bg-slate-900/95"><button type="button" className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={isSubmitting}>{isSubmitting ? 'Saving…' : event ? 'Save event' : 'Create draft event'}</button></div>
+        <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white/95 pt-4 backdrop-blur dark:border-slate-700 dark:bg-slate-900/95"><button type="button" className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={isSubmitting}>{isSubmitting ? 'Saving…' : duplicate ? 'Create duplicate draft' : event ? 'Save event' : 'Create draft event'}</button></div>
       </form>
     </Modal>
   )

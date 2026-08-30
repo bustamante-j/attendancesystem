@@ -22,6 +22,8 @@ Deno.serve(async (request) => {
       .eq('id', userId)
       .single()
     if (profileLookupError || !oldProfile) throw new Error('User not found.')
+    if (oldProfile.role === 'super_admin' && role !== 'super_admin') throw new Error('The Super Admin role is permanently protected.')
+    if (oldProfile.role !== 'super_admin' && role === 'super_admin') throw new Error('A second Super Admin cannot be created.')
 
     const { error: authError } = await admin.auth.admin.updateUserById(userId, {
       email: usernameToInternalEmail(username),

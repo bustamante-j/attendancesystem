@@ -22,6 +22,7 @@ export function UserFormModal({ user, currentUserId, error, onClose, onSave }: {
   onSave: (values: { full_name: string; username: string; password?: string; role: UserRole }) => Promise<void>
 }) {
   const isCurrentUser = user?.id === currentUserId
+  const isProtectedSuperAdmin = user?.role === 'super_admin'
   const [showPassword, setShowPassword] = useState(false)
   const { register, handleSubmit, setError, formState: { errors, isSubmitting } } = useForm<Values>({
     resolver: zodResolver(schema),
@@ -66,11 +67,9 @@ export function UserFormModal({ user, currentUserId, error, onClose, onSave }: {
         )}
         <label className="block">
           <span className="label">Role</span>
-          <select className="field" {...register('role')}>
-            <option value="super_admin">Super Admin</option>
-            {!isCurrentUser && <><option value="admin">Admin</option><option value="faculty">Faculty</option><option value="officer">Officer</option></>}
-          </select>
-          {isCurrentUser && <span className="mt-1 block text-xs text-slate-500">You cannot remove your own Super Admin role.</span>}
+          {isProtectedSuperAdmin ? <><input type="hidden" {...register('role')} /><div className="field cursor-not-allowed bg-slate-50 text-slate-500 dark:bg-slate-800">Super Admin</div></> : <select className="field" {...register('role')}><option value="admin">Admin</option><option value="faculty">Faculty</option><option value="officer">Officer</option></select>}
+          {isProtectedSuperAdmin && <span className="mt-1 block text-xs text-slate-500">The Super Admin role is permanently protected.</span>}
+          {!isProtectedSuperAdmin && isCurrentUser && <span className="mt-1 block text-xs text-slate-500">You cannot change your own role.</span>}
         </label>
         <div className="flex justify-end gap-3 border-t pt-4">
           <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>

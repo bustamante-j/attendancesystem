@@ -41,6 +41,7 @@ export function AppLayout() {
           { to: '/departments', label: 'Departments', icon: Building2 },
           { to: '/events', label: 'Events', icon: CalendarDays },
           { to: '/reports', label: 'Reports', icon: BarChart3 },
+          { to: '/users', label: 'Users', icon: UserRoundCog },
         ]
     : profile.role === 'faculty'
       ? [

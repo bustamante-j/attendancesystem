@@ -18,6 +18,12 @@
 
   body {
     @apply m-0 bg-slate-50 text-slate-900 antialiased transition-colors duration-200 dark:bg-slate-950 dark:text-slate-100;
+    background-image: radial-gradient(circle at 88% -8%, rgb(59 130 246 / 0.09), transparent 32rem);
+    background-attachment: fixed;
+  }
+
+  html.dark body {
+    background-image: radial-gradient(circle at 88% -8%, rgb(37 99 235 / 0.14), transparent 34rem);
   }
 
   button,
@@ -79,7 +85,12 @@
 
 @layer components {
   .panel {
-    @apply rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm shadow-slate-200/40 transition-colors dark:border-slate-800 dark:bg-slate-900 dark:shadow-none;
+    @apply rounded-2xl border border-slate-200/90 bg-white p-5 transition-colors dark:border-slate-800 dark:bg-slate-900;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.05), 0 18px 38px -30px rgb(15 23 42 / 0.42);
+  }
+
+  .dark .panel {
+    box-shadow: 0 1px 2px rgb(0 0 0 / 0.28), 0 20px 42px -32px rgb(0 0 0 / 0.8);
   }
 
   .field {
@@ -95,7 +106,7 @@
   }
 
   .btn-primary {
-    @apply btn bg-blue-600 text-white shadow-sm shadow-blue-900/20 hover:-translate-y-px hover:bg-blue-700 active:translate-y-0 dark:bg-blue-500 dark:hover:bg-blue-400;
+    @apply btn bg-blue-600 text-white shadow-md shadow-blue-900/20 hover:-translate-y-px hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-900/20 active:translate-y-0 active:shadow-sm dark:bg-blue-500 dark:hover:bg-blue-400;
   }
 
   .btn-secondary {
@@ -115,7 +126,8 @@
   }
 
   .table-wrap {
-    @apply overflow-x-auto rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-200/30 dark:border-slate-800 dark:bg-slate-900 dark:shadow-none;
+    @apply overflow-x-auto rounded-2xl border border-slate-200/90 bg-white dark:border-slate-800 dark:bg-slate-900;
+    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 18px 38px -30px rgb(15 23 42 / 0.38);
   }
 
   table {

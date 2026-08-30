@@ -10,6 +10,7 @@ export interface Profile {
   role: UserRole
   is_enabled: boolean
   session_revoked_at: string | null
+  deleted_at: string | null
   created_at: string
   updated_at: string
 }

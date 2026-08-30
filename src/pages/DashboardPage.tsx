@@ -2,6 +2,7 @@ import { Activity, BarChart3, Building2, CalendarDays, CalendarX2, ScanLine, Use
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Alert } from '../components/Alert'
+import { DashboardCalendar } from '../components/DashboardCalendar'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingScreen } from '../components/LoadingScreen'
 import { ViewModeToggle, type ViewMode } from '../components/ViewModeToggle'
@@ -21,6 +22,7 @@ interface EventSnapshot { event: EventRecord; summary: AttendanceSummary }
 export function DashboardPage() {
   const { profile } = useAuth()
   const [counts, setCounts] = useState<Counts | null>(null)
+  const [events, setEvents] = useState<EventRecord[]>([])
   const [snapshots, setSnapshots] = useState<EventSnapshot[]>([])
   const [error, setError] = useState<string | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('cards')
@@ -36,7 +38,7 @@ export function DashboardPage() {
           supabase.from('departments').select('id', { count: 'exact', head: true }).is('deleted_at', null),
           supabase.from('events').select('id', { count: 'exact', head: true }).is('deleted_at', null),
           profile?.role === 'super_admin'
-            ? supabase.from('profiles').select('id', { count: 'exact', head: true })
+            ? supabase.from('profiles').select('id', { count: 'exact', head: true }).is('deleted_at', null)
             : Promise.resolve({ count: 0, error: null }),
         ]),
         listEvents(),
@@ -46,6 +48,7 @@ export function DashboardPage() {
       const recent = eventRows.slice(0, 5)
       const summaries = await Promise.all(recent.map(async (event) => ({ event, summary: await getAttendanceSummary(event.id) })))
       setCounts({ students: queries[0].count ?? 0, departments: queries[1].count ?? 0, events: queries[2].count ?? 0, users: queries[3].count ?? 0 })
+      setEvents(eventRows)
       setSnapshots(summaries)
       setError(null)
     } catch (cause) {
@@ -107,6 +110,7 @@ export function DashboardPage() {
           />
         </Suspense>
       )}
+      <DashboardCalendar events={events} />
       <section className="panel">
         <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-base font-semibold">Recent event attendance</h2><p className="mt-1 text-sm text-slate-500">Updates automatically when attendance changes.</p></div><Link className="btn-secondary" to="/reports"><BarChart3 size={16} /> Open reports</Link></div>
         <div className="mt-5 divide-y divide-slate-200 dark:divide-slate-800">

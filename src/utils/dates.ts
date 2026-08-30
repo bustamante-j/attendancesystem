@@ -8,6 +8,15 @@ export function formatManilaDate(value: string | Date) {
   }).format(new Date(value))
 }
 
+export function toManilaDateKey(value: string | Date) {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: MANILA_TIME_ZONE,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date(value))
+  const part = (type: Intl.DateTimeFormatPartTypes) => parts.find((item) => item.type === type)?.value ?? ''
+  return `${part('year')}-${part('month')}-${part('day')}`
+}
+
 export function toDateTimeLocal(value: string | Date) {
   const parts = new Intl.DateTimeFormat('en-CA', {
     timeZone: MANILA_TIME_ZONE,

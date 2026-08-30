@@ -3,7 +3,11 @@ import type { Profile, UserRole } from '../types/app'
 import { invokeFunction } from './functions'
 
 export async function listProfiles() {
-  const { data, error } = await supabase.from('profiles').select('*').order('full_name')
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('id,username,full_name,role,is_enabled,session_revoked_at,deleted_at,created_at,updated_at')
+    .is('deleted_at', null)
+    .order('full_name')
   if (error) throw error
   return data as Profile[]
 }
@@ -31,4 +35,8 @@ export async function setUserEnabled(userId: string, enabled: boolean) {
 export async function forceUserLogout(userId: string) {
   const { error } = await supabase.rpc('force_user_logout', { p_user_id: userId })
   if (error) throw error
+}
+
+export async function deleteUser(userId: string) {
+  return invokeFunction<{ success: boolean; warning?: string }>('delete-user', { user_id: userId })
 }
