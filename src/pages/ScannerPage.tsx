@@ -54,10 +54,10 @@ function resultStyles(tone: ScanFeedbackTone) {
   return 'border-red-300 bg-red-50 text-red-900 dark:border-red-700 dark:bg-red-950/70 dark:text-red-100'
 }
 
-function ResultIcon({ tone }: { tone: ScanFeedbackTone }) {
-  if (tone === 'success') return <CheckCircle2 className="text-emerald-700" size={28} />
-  if (tone === 'warning') return <TriangleAlert className="text-amber-700" size={28} />
-  return <XCircle className="text-red-700" size={28} />
+function ResultIcon({ tone, size = 28 }: { tone: ScanFeedbackTone; size?: number }) {
+  if (tone === 'success') return <CheckCircle2 className="shrink-0 text-emerald-700" size={size} />
+  if (tone === 'warning') return <TriangleAlert className="shrink-0 text-amber-700" size={size} />
+  return <XCircle className="shrink-0 text-red-700" size={size} />
 }
 
 export function ScannerPage() {
@@ -143,7 +143,7 @@ export function ScannerPage() {
 
   useEffect(() => {
     if (!scanPopup) return
-    const timeout = window.setTimeout(() => setScanPopup(null), 3_000)
+    const timeout = window.setTimeout(() => setScanPopup(null), 5_000)
     return () => window.clearTimeout(timeout)
   }, [scanPopup])
 
@@ -280,13 +280,13 @@ export function ScannerPage() {
         <>
           {scanPopup?.result.student && (
             <div className="pointer-events-none fixed inset-x-3 top-20 z-[70] flex justify-center" aria-live="assertive" aria-atomic="true">
-              <div className={`w-full max-w-md rounded-2xl border p-4 shadow-2xl backdrop-blur ${resultStyles(resultTone(scanPopup.result.code))}`} role="status">
-                <div className="flex items-center gap-3">
-                  <ResultIcon tone={resultTone(scanPopup.result.code)} />
+              <div className={`w-full max-w-2xl rounded-2xl border p-5 shadow-2xl backdrop-blur sm:p-6 ${resultStyles(resultTone(scanPopup.result.code))}`} role="status">
+                <div className="flex items-center gap-4 sm:gap-5">
+                  <ResultIcon tone={resultTone(scanPopup.result.code)} size={42} />
                   <div className="min-w-0">
-                    <div className="text-xs font-bold uppercase tracking-wider opacity-70">{scanPopup.method === 'qr' ? 'QR scan recorded' : 'Manual attendance recorded'}</div>
-                    <div className="truncate text-lg font-bold">{scanPopup.result.student.fullName}</div>
-                    <div className="font-mono text-sm font-semibold">Student ID: {scanPopup.result.student.studentNumber}</div>
+                    <div className="text-xs font-bold uppercase tracking-wider opacity-70 sm:text-sm">{scanPopup.method === 'qr' ? 'QR scan recorded' : 'Manual attendance recorded'}</div>
+                    <div className="break-words text-3xl font-black leading-tight tracking-tight sm:text-4xl">{scanPopup.result.student.fullName}</div>
+                    <div className="mt-1 font-mono text-base font-bold sm:text-lg">Student ID: {scanPopup.result.student.studentNumber}</div>
                   </div>
                 </div>
               </div>

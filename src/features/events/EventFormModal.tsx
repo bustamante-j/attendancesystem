@@ -7,7 +7,7 @@ import { Alert } from '../../components/Alert'
 import { Modal } from '../../components/Modal'
 import type { EventInput } from '../../services/events'
 import type { Department, EventRecord } from '../../types/app'
-import { manilaDateTimeToIso, toDateTimeLocal } from '../../utils/dates'
+import { formatManilaDate, manilaDateTimeToIso, toDateTimeLocal } from '../../utils/dates'
 
 const schema = z.object({
   name: z.string().trim().min(1, 'Event name is required.').max(200),
@@ -15,6 +15,8 @@ const schema = z.object({
   venue: z.string().max(300),
   start_at: z.string().min(1, 'Start time is required.'),
   end_at: z.string().min(1, 'End time is required.'),
+  duration_hours: z.number().int('Hours must be a whole number.').min(0, 'Hours cannot be negative.').max(8760, 'Duration cannot exceed one year.'),
+  duration_minutes: z.number().int('Minutes must be a whole number.').min(0, 'Minutes cannot be negative.').max(59, 'Minutes must be between 0 and 59.'),
   check_in_opens_at: z.string().min(1),
   late_after: z.string().min(1),
   check_in_closes_at: z.string().min(1),
@@ -37,6 +39,7 @@ const schema = z.object({
   const opens = parse(values.check_in_opens_at)
   const late = parse(values.late_after)
   const closes = parse(values.check_in_closes_at)
+  if (values.duration_hours * 60 + values.duration_minutes < 1) context.addIssue({ code: 'custom', path: ['duration_hours'], message: 'Duration must be at least 1 minute.' })
   if (start > end) context.addIssue({ code: 'custom', path: ['end_at'], message: 'End must be after the start.' })
   if (opens > late) context.addIssue({ code: 'custom', path: ['late_after'], message: 'Late threshold must be after check-in opens.' })
   if (late > closes) context.addIssue({ code: 'custom', path: ['check_in_closes_at'], message: 'Check-in close must be after the late threshold.' })
@@ -50,21 +53,30 @@ const schema = z.object({
 type Values = z.infer<typeof schema>
 type TimingPreset = 'standard' | 'strict' | 'custom'
 
+function durationParts(startAt: string, endAt: string) {
+  const totalMinutes = Math.max(1, Math.round((new Date(endAt).getTime() - new Date(startAt).getTime()) / 60_000))
+  return { duration_hours: Math.floor(totalMinutes / 60), duration_minutes: totalMinutes % 60 }
+}
+
 function defaults(event: EventRecord | null, audience: { departmentIds: string[]; yearLevels: number[] } | null, departmentId: string, duplicate: boolean): Values {
-  if (event) return {
-    name: duplicate ? `Copy of ${event.name}` : event.name,
-    description: event.description ?? '',
-    venue: event.venue ?? '',
-    start_at: toDateTimeLocal(event.start_at),
-    end_at: toDateTimeLocal(event.end_at),
-    check_in_opens_at: toDateTimeLocal(event.check_in_opens_at),
-    late_after: toDateTimeLocal(event.late_after),
-    check_in_closes_at: toDateTimeLocal(event.check_in_closes_at),
-    attendance_mode: event.attendance_mode,
-    check_out_opens_at: event.check_out_opens_at ? toDateTimeLocal(event.check_out_opens_at) : '',
-    check_out_closes_at: event.check_out_closes_at ? toDateTimeLocal(event.check_out_closes_at) : '',
-    department_ids: audience?.departmentIds ?? [],
-    year_levels: audience?.yearLevels ?? [],
+  if (event) {
+    const duration = durationParts(event.start_at, event.end_at)
+    return {
+      name: duplicate ? `Copy of ${event.name}` : event.name,
+      description: event.description ?? '',
+      venue: event.venue ?? '',
+      start_at: toDateTimeLocal(event.start_at),
+      end_at: toDateTimeLocal(event.end_at),
+      ...duration,
+      check_in_opens_at: toDateTimeLocal(event.check_in_opens_at),
+      late_after: toDateTimeLocal(event.late_after),
+      check_in_closes_at: toDateTimeLocal(event.check_in_closes_at),
+      attendance_mode: event.attendance_mode,
+      check_out_opens_at: event.check_out_opens_at ? toDateTimeLocal(event.check_out_opens_at) : '',
+      check_out_closes_at: event.check_out_closes_at ? toDateTimeLocal(event.check_out_closes_at) : '',
+      department_ids: audience?.departmentIds ?? [],
+      year_levels: audience?.yearLevels ?? [],
+    }
   }
   const now = new Date()
   const start = new Date(now.getTime() + 60 * 60 * 1000)
@@ -75,6 +87,8 @@ function defaults(event: EventRecord | null, audience: { departmentIds: string[]
     venue: '',
     start_at: toDateTimeLocal(start),
     end_at: toDateTimeLocal(end),
+    duration_hours: 4,
+    duration_minutes: 0,
     check_in_opens_at: toDateTimeLocal(new Date(start.getTime() - 30 * 60 * 1000)),
     late_after: toDateTimeLocal(new Date(start.getTime() + 15 * 60 * 1000)),
     check_in_closes_at: toDateTimeLocal(new Date(start.getTime() + 60 * 60 * 1000)),
@@ -133,12 +147,16 @@ export function EventFormModal({ event, audience, departments, duplicate = false
   const mode = watch('attendance_mode')
   const startAt = watch('start_at')
   const endAt = watch('end_at')
+  const durationHours = watch('duration_hours')
+  const durationMinutes = watch('duration_minutes')
   const validationMessages = [
     errors.name?.message,
     errors.description?.message,
     errors.venue?.message,
     errors.start_at?.message,
     errors.end_at?.message,
+    errors.duration_hours?.message,
+    errors.duration_minutes?.message,
     errors.check_in_opens_at?.message,
     errors.late_after?.message,
     errors.check_in_closes_at?.message,
@@ -147,6 +165,16 @@ export function EventFormModal({ event, audience, departments, duplicate = false
     errors.department_ids?.message,
     errors.year_levels?.message,
   ].filter((message): message is string => typeof message === 'string')
+
+  useEffect(() => {
+    const totalMinutes = durationHours * 60 + durationMinutes
+    if (!Number.isFinite(totalMinutes) || totalMinutes < 1) {
+      setValue('end_at', '')
+      return
+    }
+    const calculatedEnd = shiftLocal(startAt, totalMinutes)
+    setValue('end_at', calculatedEnd)
+  }, [durationHours, durationMinutes, setValue, startAt])
 
   useEffect(() => {
     if (timingPreset === 'custom') return
@@ -164,7 +192,10 @@ export function EventFormModal({ event, audience, departments, duplicate = false
   }, [endAt, setValue, startAt, timingPreset])
 
   const submit = (values: Values) => onSave({
-    ...values,
+    name: values.name,
+    description: values.description,
+    venue: values.venue,
+    attendance_mode: values.attendance_mode,
     start_at: manilaDateTimeToIso(values.start_at),
     end_at: manilaDateTimeToIso(values.end_at),
     check_in_opens_at: manilaDateTimeToIso(values.check_in_opens_at),
@@ -193,11 +224,20 @@ export function EventFormModal({ event, audience, departments, duplicate = false
           <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
             <div className="flex items-center gap-2"><CalendarClock size={18} className="text-blue-600" /><div><h3 className="font-semibold">Schedule</h3><p className="text-xs text-slate-500">All times use Asia/Manila.</p></div></div>
           </div>
+          <input type="hidden" {...register('end_at')} />
           <div className="grid gap-4 lg:grid-cols-2">
             <Controller control={control} name="start_at" render={({ field }) => <SplitDateTimeField label="Event starts" value={field.value} onChange={field.onChange} error={errors.start_at?.message} />} />
-            <Controller control={control} name="end_at" render={({ field }) => <SplitDateTimeField label="Event ends" value={field.value} onChange={field.onChange} error={errors.end_at?.message} />} />
+            <fieldset className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/40">
+              <legend className="px-1 text-sm font-semibold text-slate-800 dark:text-slate-100">Event duration</legend>
+              <div className="mt-1 grid grid-cols-2 gap-3">
+                <label><span className="label text-xs">Hours</span><input className="field" min={0} max={8760} inputMode="numeric" type="number" {...register('duration_hours', { valueAsNumber: true })} /></label>
+                <label><span className="label text-xs">Minutes</span><input className="field" min={0} max={59} inputMode="numeric" type="number" {...register('duration_minutes', { valueAsNumber: true })} /></label>
+              </div>
+              {endAt ? <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-900 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-200"><span className="font-semibold">Calculated end:</span> {formatManilaDate(manilaDateTimeToIso(endAt))}</div> : null}
+              {(errors.duration_hours || errors.duration_minutes || errors.end_at) && <span className="mt-2 block text-xs text-red-700 dark:text-red-400">{errors.duration_hours?.message ?? errors.duration_minutes?.message ?? errors.end_at?.message}</span>}
+            </fieldset>
           </div>
-          <p className="mt-3 text-xs text-slate-500">Start and end dates can be different, so multi-day events such as intramurals are supported.</p>
+          <p className="mt-3 text-xs text-slate-500">For multi-day events, enter the full duration in hours (for example, 72 hours for three days).</p>
         </section>
 
         <section className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
