@@ -7,6 +7,7 @@ import {
   LogOut,
   Menu,
   MonitorDown,
+  ScrollText,
   Users,
   UserRoundCog,
   X,
@@ -32,6 +33,7 @@ export function AppLayout() {
         { to: '/events', label: 'Events', icon: CalendarDays },
         { to: '/reports', label: 'Reports', icon: BarChart3 },
         { to: '/users', label: 'Users', icon: UserRoundCog },
+        { to: '/activity-log', label: 'Activity Log', icon: ScrollText },
         ...(import.meta.env.DEV ? [{ to: '/dev', label: 'Dev Tools', icon: Code2 }] : []),
       ]
     : profile.role === 'admin'

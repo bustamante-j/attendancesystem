@@ -6,6 +6,7 @@ import { ProtectedRoute } from '../components/ProtectedRoute'
 import { useAuth } from '../features/auth/AuthProvider'
 
 const DashboardPage = lazy(() => import('../pages/DashboardPage').then((module) => ({ default: module.DashboardPage })))
+const ActivityLogPage = lazy(() => import('../pages/ActivityLogPage').then((module) => ({ default: module.ActivityLogPage })))
 const DepartmentsPage = lazy(() => import('../pages/DepartmentsPage').then((module) => ({ default: module.DepartmentsPage })))
 const DevPage = lazy(() => import('../pages/DevPage').then((module) => ({ default: module.DevPage })))
 const EventsPage = lazy(() => import('../pages/EventsPage').then((module) => ({ default: module.EventsPage })))
@@ -34,6 +35,7 @@ export function App() {
           <Route path="events/:eventId/scanner" element={<ScannerPage />} />
           <Route path="reports" element={<ProtectedRoute roles={['super_admin', 'admin', 'faculty']}><ReportsPage /></ProtectedRoute>} />
           <Route path="users" element={<ProtectedRoute roles={['super_admin', 'admin']}><UsersPage /></ProtectedRoute>} />
+          <Route path="activity-log" element={<ProtectedRoute roles={['super_admin']}><ActivityLogPage /></ProtectedRoute>} />
           <Route path="dev" element={<ProtectedRoute roles={['super_admin']}><DevPage /></ProtectedRoute>} />
           <Route path="*" element={<NotFoundPage />} />
         </Route>
