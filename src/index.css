@@ -259,6 +259,10 @@
   .attendee-mode-button-active {
     @apply bg-white text-blue-700 shadow-sm dark:bg-slate-950 dark:text-blue-300;
   }
+
+  .report-table th {
+    @apply text-sm font-semibold normal-case tracking-normal text-slate-700 dark:text-slate-300;
+  }
 }
 
 @media (min-width: 1024px) {

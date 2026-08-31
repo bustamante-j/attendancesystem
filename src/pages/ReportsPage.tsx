@@ -1,4 +1,4 @@
-import { Download, History, Pencil, Radio, RefreshCw, Search, SearchX } from 'lucide-react'
+import { CalendarDays, Download, History, Pencil, Radio, RefreshCw, Search, SearchX } from 'lucide-react'
 import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { Alert } from '../components/Alert'
@@ -21,6 +21,14 @@ import { formatManilaDate } from '../utils/dates'
 
 const PAGE_SIZE = 50
 
+type ReportTab = 'overview' | 'attendance' | 'history'
+
+const REPORT_TABS: { id: ReportTab; label: string }[] = [
+  { id: 'overview', label: 'Overview' },
+  { id: 'attendance', label: 'Attendance list' },
+  { id: 'history', label: 'Student history' },
+]
+
 const ReportCharts = lazy(() => import('../features/reports/ReportCharts').then((module) => ({ default: module.ReportCharts })))
 
 function groupReport(rows: AttendanceReportRow[], labelFor: (row: AttendanceReportRow) => string) {
@@ -39,22 +47,23 @@ function groupReport(rows: AttendanceReportRow[], labelFor: (row: AttendanceRepo
   return [...groups.values()].sort((left, right) => left.label.localeCompare(right.label, undefined, { numeric: true }))
 }
 
-function SummaryDetails({ title, rows }: { title: string; rows: ReportGroupSummary[] }) {
+function SummaryTable({ title, labelHeading, rows }: { title: string; labelHeading: string; rows: ReportGroupSummary[] }) {
   return (
-    <section className="panel">
-      <h2 className="font-semibold">{title}</h2>
-      <div className="mt-4 grid gap-3 sm:grid-cols-2">
+    <section>
+      <h2 className="mb-3 text-base font-semibold text-slate-900 dark:text-white">{title}</h2>
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
+        <div className="grid grid-cols-[minmax(0,1fr)_repeat(3,4.25rem)] gap-2 border-b border-slate-200 bg-slate-50/70 px-4 py-3 text-xs font-semibold text-slate-500 dark:border-slate-800 dark:bg-slate-950/35 dark:text-slate-400">
+          <span>{labelHeading}</span><span className="text-right">Present</span><span className="text-right">Late</span><span className="text-right">Absent</span>
+        </div>
         {rows.map((row) => (
-          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3 dark:border-slate-700 dark:bg-slate-800/60" key={row.label}>
-            <div className="font-semibold">{row.label}</div>
-            <div className="mt-2 grid grid-cols-3 gap-2 text-xs">
-              <div><span className="block text-slate-500">Present</span><strong className="text-emerald-700 dark:text-emerald-300">{row.present}</strong></div>
-              <div><span className="block text-slate-500">Late</span><strong className="text-amber-700 dark:text-amber-300">{row.late}</strong></div>
-              <div><span className="block text-slate-500">Absent</span><strong>{row.absent}</strong></div>
-            </div>
+          <div className="grid grid-cols-[minmax(0,1fr)_repeat(3,4.25rem)] gap-2 border-b border-slate-100 px-4 py-3 text-sm last:border-b-0 dark:border-slate-800" key={row.label}>
+            <span className="truncate font-medium text-slate-800 dark:text-slate-100">{row.label}</span>
+            <strong className="text-right font-semibold tabular-nums text-emerald-700 dark:text-emerald-300">{row.present}</strong>
+            <strong className="text-right font-semibold tabular-nums text-amber-700 dark:text-amber-300">{row.late}</strong>
+            <strong className="text-right font-semibold tabular-nums text-red-700 dark:text-red-300">{row.absent}</strong>
           </div>
         ))}
-        {!rows.length && <p className="py-4 text-center text-sm text-slate-500 sm:col-span-2">No summary data.</p>}
+        {!rows.length && <p className="px-4 py-8 text-center text-sm text-slate-500">No summary data.</p>}
       </div>
     </section>
   )
@@ -73,6 +82,9 @@ export function ReportsPage() {
   const canCorrect = profile?.role === 'super_admin' || profile?.role === 'admin'
   const [events, setEvents] = useState<EventRecord[]>([])
   const [students, setStudents] = useState<Student[]>([])
+  const [studentsLoaded, setStudentsLoaded] = useState(false)
+  const [studentsLoading, setStudentsLoading] = useState(false)
+  const [activeTab, setActiveTab] = useState<ReportTab>('overview')
   const [eventId, setEventId] = useState('')
   const [rows, setRows] = useState<AttendanceReportRow[]>([])
   const [search, setSearch] = useState('')
@@ -95,16 +107,29 @@ export function ReportsPage() {
 
   useEffect(() => {
     let current = true
-    void Promise.all([listEvents(), listStudents()]).then(([eventRows, studentRows]) => {
+    void listEvents().then((eventRows) => {
       if (!current) return
       setEvents(eventRows)
-      setStudents(studentRows)
       setEventId(requestedEventId && eventRows.some((event) => event.id === requestedEventId) ? requestedEventId : eventRows[0]?.id ?? '')
     }).catch((cause: unknown) => {
       if (current) setMessage({ text: friendlyError(cause, 'Reports could not be prepared.'), tone: 'error' })
     }).finally(() => { if (current) setLoading(false) })
     return () => { current = false }
   }, [requestedEventId])
+
+  useEffect(() => {
+    if (activeTab !== 'history' || studentsLoaded) return
+    let current = true
+    setStudentsLoading(true)
+    void listStudents().then((studentRows) => {
+      if (!current) return
+      setStudents(studentRows)
+      setStudentsLoaded(true)
+    }).catch((cause: unknown) => {
+      if (current) setMessage({ text: friendlyError(cause, 'Student history search could not be prepared.'), tone: 'error' })
+    }).finally(() => { if (current) setStudentsLoading(false) })
+    return () => { current = false }
+  }, [activeTab, studentsLoaded])
 
   const refreshReport = useCallback(async (showLoading = false) => {
     if (!eventId) { setRows([]); return }
@@ -164,6 +189,8 @@ export function ReportsPage() {
   }), [department, method, rows, search, status, year])
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
   const pageRows = filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const studentCountLabel = `${filteredRows.length.toLocaleString()} ${filteredRows.length === 1 ? 'student' : 'students'}`
+  const resultCountLabel = `${filteredRows.length.toLocaleString()} ${filteredRows.length === 1 ? 'result' : 'results'}`
 
   const summary = useMemo(() => {
     const expectedRows = rows.filter((row) => row.is_expected)
@@ -208,9 +235,8 @@ export function ReportsPage() {
   return (
     <div className="space-y-5">
       <header className="page-header">
-        <div><h1 className="page-title">Reports</h1><p className="page-subtitle">Live event analytics, student history, corrections, and Excel exports.</p></div>
+        <div><h1 className="page-title">Reports</h1><p className="page-subtitle">Event attendance insights and exports.</p></div>
         <div className="flex flex-wrap gap-2">
-          <ViewModeToggle value={viewMode} onChange={setViewMode} label="Report analytics view" />
           <button className="btn-secondary" disabled={!eventId || reportLoading} onClick={() => void refreshReport(true)}><RefreshCw className={reportLoading ? 'animate-spin' : ''} size={16} /> Refresh</button>
           <button className="btn-primary" disabled={!eventRecord || !filteredRows.length || exporting} onClick={() => void exportReport()}><Download size={16} /> {exporting ? 'Exporting…' : 'Export Excel'}</button>
         </div>
@@ -218,52 +244,101 @@ export function ReportsPage() {
 
       {message && <Alert message={message.text} tone={message.tone} />}
 
-      <section className="panel flex flex-wrap items-end gap-4">
-        <label className="min-w-64 flex-1"><span className="label">Event</span><select className="field" value={eventId} onChange={(event) => setEventId(event.target.value)}>{events.map((event) => <option key={event.id} value={event.id}>{event.name} · {formatManilaDate(event.start_at)}</option>)}</select></label>
-        <div className="pb-2 text-xs text-slate-500"><span className="inline-flex items-center gap-1 font-medium text-emerald-700"><Radio size={14} /> Live</span>{lastUpdated && <> · Updated {lastUpdated.toLocaleTimeString('en-PH')}</>}</div>
+      <section className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:flex-row sm:items-end">
+        <label className="min-w-0 flex-1"><span className="label">Event</span><span className="relative block"><CalendarDays className="pointer-events-none absolute left-3 top-3 text-slate-400" size={17} /><select className="field pl-10" value={eventId} onChange={(event) => setEventId(event.target.value)}>{events.map((event) => <option key={event.id} value={event.id}>{event.name} · {formatManilaDate(event.start_at)}</option>)}</select></span></label>
+        <div className="pb-2 text-xs text-slate-500 sm:text-right"><span className="inline-flex items-center gap-1 font-medium text-emerald-700 dark:text-emerald-300"><Radio size={14} /> Live</span>{lastUpdated ? <> · Updated {lastUpdated.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })}</> : null}</div>
       </section>
+
+      <nav className="flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-800" aria-label="Report sections" role="tablist">
+        {REPORT_TABS.map((tab) => (
+          <button aria-controls={`report-panel-${tab.id}`} aria-selected={activeTab === tab.id} className={`min-h-11 shrink-0 border-b-2 px-4 py-2 text-sm font-semibold transition ${activeTab === tab.id ? 'border-blue-600 text-blue-700 dark:border-blue-400 dark:text-blue-300' : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-900 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-white'}`} id={`report-tab-${tab.id}`} key={tab.id} onClick={() => setActiveTab(tab.id)} role="tab" type="button">
+            {tab.label}
+          </button>
+        ))}
+      </nav>
 
       {!events.length ? <Alert tone="info" message="No accessible events are available for reporting." /> : reportLoading && !rows.length ? <LoadingScreen label="Building event report…" /> : (
         <>
-          {viewMode === 'cards' ? (
-            <>
-              <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-                {[['Expected', summary.expected], ['Present', summary.present], ['Late', summary.late], ['Absent', summary.absent], ['Attendance', `${summary.rate}%`], ...(eventRecord?.attendance_mode === 'check_in_out' ? [['Checked out', summary.checkedOut]] : []), ...(summary.outsideAudience > 0 ? [['Outside audience', summary.outsideAudience]] : [])].map(([label, count]) => <div className="panel p-4" key={label}><div className="text-xs font-medium text-slate-500">{label}</div><div className="mt-1 text-2xl font-bold tabular-nums">{count}</div></div>)}
+          {activeTab === 'overview' && (
+            <div aria-labelledby="report-tab-overview" className="space-y-5" id="report-panel-overview" role="tabpanel">
+              <div className="flex justify-end"><ViewModeToggle value={viewMode} onChange={setViewMode} label="Report analytics view" /></div>
+              <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div className="grid grid-cols-2 lg:grid-cols-4">
+                  {[
+                    { label: 'Expected', value: summary.expected, tone: 'text-slate-950 dark:text-white' },
+                    { label: 'Attended', value: summary.present + summary.late, tone: 'text-emerald-700 dark:text-emerald-300', context: `${summary.rate}% attendance` },
+                    { label: 'Late', value: summary.late, tone: 'text-amber-700 dark:text-amber-300' },
+                    { label: 'Absent', value: summary.absent, tone: 'text-red-700 dark:text-red-300' },
+                  ].map((metric, index) => (
+                    <div className={`min-h-28 px-5 py-5 text-center ${index % 2 === 0 ? 'border-r' : ''} ${index < 2 ? 'border-b lg:border-b-0' : ''} border-slate-200 lg:border-r lg:last:border-r-0 dark:border-slate-800`} key={metric.label}>
+                      <div className="text-sm font-medium text-slate-500">{metric.label}</div>
+                      <div className={`mt-1 text-3xl font-semibold tracking-tight tabular-nums ${metric.tone}`}>{metric.value.toLocaleString()}</div>
+                      {metric.context ? <div className="mt-1 text-xs text-slate-500">{metric.context}</div> : null}
+                    </div>
+                  ))}
+                </div>
+                {(eventRecord?.attendance_mode === 'check_in_out' || summary.outsideAudience > 0) && (
+                  <div className="flex flex-wrap justify-center gap-x-6 gap-y-1 border-t border-slate-200 px-4 py-2.5 text-xs text-slate-500 dark:border-slate-800">
+                    {eventRecord?.attendance_mode === 'check_in_out' ? <span><strong className="text-slate-700 dark:text-slate-200">{summary.checkedOut}</strong> checked out</span> : null}
+                    {summary.outsideAudience > 0 ? <span><strong className="text-amber-700 dark:text-amber-300">{summary.outsideAudience}</strong> outside the expected audience</span> : null}
+                  </div>
+                )}
               </section>
-              <div className="grid gap-5 lg:grid-cols-2"><SummaryDetails title="Department summary" rows={departmentSummary} /><SummaryDetails title="Year-level summary" rows={yearSummary} /></div>
-            </>
-          ) : (
-            <Suspense fallback={<div className="grid min-h-80 place-items-center rounded-2xl border border-slate-200 bg-white text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900">Loading report graphsâ€¦</div>}>
-              <ReportCharts summary={summary} departmentSummary={departmentSummary} yearSummary={yearSummary} showCheckedOut={eventRecord?.attendance_mode === 'check_in_out'} />
-            </Suspense>
+
+              {viewMode === 'cards' ? (
+                <div className="grid gap-5 lg:grid-cols-2">
+                  <SummaryTable title="By department" labelHeading="Department" rows={departmentSummary} />
+                  <SummaryTable title="By year level" labelHeading="Year level" rows={yearSummary} />
+                </div>
+              ) : (
+                <Suspense fallback={<div className="grid min-h-80 place-items-center rounded-xl border border-slate-200 bg-white text-sm text-slate-500 dark:border-slate-800 dark:bg-slate-900">Loading report graphs…</div>}>
+                  <ReportCharts summary={summary} departmentSummary={departmentSummary} yearSummary={yearSummary} showCheckedOut={eventRecord?.attendance_mode === 'check_in_out'} />
+                </Suspense>
+              )}
+            </div>
           )}
 
-          <section className="panel">
-            <div className="flex items-center gap-2"><History size={18} /><h2 className="font-semibold">Student attendance history</h2></div>
-            <p className="mt-1 text-xs text-slate-500">Search any active student to view attendance across completed events.</p>
-            <div className="relative mt-3"><Search className="pointer-events-none absolute left-3 top-2.5 text-slate-400" size={18} /><input className="field pl-10" value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} placeholder="Search Student ID or name" /></div>
-            {!!studentMatches.length && <div className="mt-2 divide-y rounded-lg border border-slate-200">{studentMatches.map((student) => <button className="flex w-full items-center justify-between gap-3 p-3 text-left hover:bg-slate-50" key={student.id} onClick={() => { setHistoryStudent(student); setStudentSearch('') }}><span><span className="block text-sm font-medium">{student.full_name}</span><span className="text-xs text-slate-500">{student.student_number} · {student.departments?.code ?? 'Unknown'} · Year {student.year_level}</span></span><History className="text-slate-400" size={17} /></button>)}</div>}
-          </section>
+          {activeTab === 'attendance' && (
+            <div aria-labelledby="report-tab-attendance" className="space-y-4" id="report-panel-attendance" role="tabpanel">
+              <section className="flex flex-wrap items-center gap-2">
+                <SearchInput value={search} onChange={setSearch} placeholder="Search Student ID or name" />
+                <select aria-label="Filter by department" className="field w-full sm:w-44" value={department} onChange={(event) => setDepartment(event.target.value)}><option value="all">All departments</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.code}</option>)}</select>
+                <select aria-label="Filter by year level" className="field w-full sm:w-36" value={year} onChange={(event) => setYear(event.target.value)}><option value="all">All years</option>{[1, 2, 3, 4].map((item) => <option key={item} value={item}>Year {item}</option>)}</select>
+                <select aria-label="Filter by attendance status" className="field w-full sm:w-36" value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All statuses</option><option value="present">Present</option><option value="late">Late</option><option value="absent">Absent</option></select>
+                <select aria-label="Filter by attendance method" className="field w-full sm:w-36" value={method} onChange={(event) => setMethod(event.target.value)}><option value="all">All methods</option><option value="qr">QR</option><option value="manual">Manual</option></select>
+              </section>
 
-          <section className="panel flex flex-wrap gap-3 p-4">
-            <SearchInput value={search} onChange={setSearch} placeholder="Search Student ID or name" />
-            <select aria-label="Filter by department" className="field max-w-44" value={department} onChange={(event) => setDepartment(event.target.value)}><option value="all">All departments</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.code}</option>)}</select>
-            <select aria-label="Filter by year level" className="field max-w-36" value={year} onChange={(event) => setYear(event.target.value)}><option value="all">All years</option>{[1, 2, 3, 4].map((item) => <option key={item} value={item}>Year {item}</option>)}</select>
-            <select aria-label="Filter by attendance status" className="field max-w-36" value={status} onChange={(event) => setStatus(event.target.value)}><option value="all">All statuses</option><option value="present">Present</option><option value="late">Late</option><option value="absent">Absent</option></select>
-            <select aria-label="Filter by attendance method" className="field max-w-36" value={method} onChange={(event) => setMethod(event.target.value)}><option value="all">All methods</option><option value="qr">QR</option><option value="manual">Manual</option></select>
-          </section>
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900">
+                <div className="flex justify-end border-b border-slate-200 px-4 py-2.5 text-xs font-medium text-slate-500 dark:border-slate-800">{studentCountLabel}</div>
+                <div className="overflow-x-auto">
+                  <table className="report-table">
+                    <thead><tr><th>Student</th><th>Department</th><th>Status</th><th>Check-in</th><th>Check-out</th><th>Actions</th></tr></thead>
+                    <tbody>
+                      {pageRows.map((row) => <tr key={row.student_id}><td><div className="font-medium">{row.full_name}</div><div className="text-xs text-slate-500">{row.student_number} · {row.sex}</div>{!row.is_expected && <div className="mt-1 text-xs text-amber-700">Outside current expected list</div>}</td><td>{row.department_code}<div className="text-xs text-slate-500">Year {row.year_level}</div></td><td><span className={`rounded-full px-2 py-1 text-xs font-medium capitalize ${statusStyle(row.attendance_status)}`}>{row.attendance_status}</span></td><td>{row.check_in_at ? <>{formatManilaDate(row.check_in_at)}<div className="text-xs uppercase text-slate-500">{row.check_in_method}</div></> : '—'}</td><td>{row.check_out_at ? <>{formatManilaDate(row.check_out_at)}<div className="text-xs uppercase text-slate-500">{row.check_out_method}</div></> : '—'}</td><td><div className="flex flex-wrap gap-2"><button className="btn-secondary min-h-9 px-3 py-1.5 text-xs" onClick={() => setHistoryStudent({ id: row.student_id, student_number: row.student_number, full_name: row.full_name })}><History size={14} /> History</button>{canCorrect && <button className="btn-secondary min-h-9 px-3 py-1.5 text-xs" onClick={() => setEditingRow(row)}><Pencil size={14} /> Correct</button>}</div></td></tr>)}
+                      {!pageRows.length && <tr><td colSpan={6}><EmptyState compact icon={SearchX} title="No report rows found" description="Try changing the report filters." /></td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 dark:border-slate-800">
+                  <span className="text-xs text-slate-500">Page {page} of {pageCount} · {resultCountLabel}</span>
+                  <div className="flex gap-2"><button className="btn-secondary min-h-9 py-1.5 text-xs" disabled={page === 1} onClick={() => setPage((current) => current - 1)}>Previous</button><button className="btn-secondary min-h-9 py-1.5 text-xs" disabled={page === pageCount} onClick={() => setPage((current) => current + 1)}>Next</button></div>
+                </div>
+              </div>
+            </div>
+          )}
 
-          <div className="table-wrap">
-            <table>
-              <thead><tr><th>Student</th><th>Department</th><th>Status</th><th>Check-in</th><th>Check-out</th><th>Actions</th></tr></thead>
-              <tbody>
-                {pageRows.map((row) => <tr key={row.student_id}><td><div className="font-medium">{row.full_name}</div><div className="text-xs text-slate-500">{row.student_number} · {row.sex}</div>{!row.is_expected && <div className="mt-1 text-xs text-amber-700">Outside current expected list</div>}</td><td>{row.department_code}<div className="text-xs text-slate-500">Year {row.year_level}</div></td><td><span className={`rounded-full px-2 py-1 text-xs font-medium capitalize ${statusStyle(row.attendance_status)}`}>{row.attendance_status}</span></td><td>{row.check_in_at ? <>{formatManilaDate(row.check_in_at)}<div className="text-xs uppercase text-slate-500">{row.check_in_method}</div></> : '—'}</td><td>{row.check_out_at ? <>{formatManilaDate(row.check_out_at)}<div className="text-xs uppercase text-slate-500">{row.check_out_method}</div></> : '—'}</td><td><div className="flex flex-wrap gap-2"><button className="btn-secondary" onClick={() => setHistoryStudent({ id: row.student_id, student_number: row.student_number, full_name: row.full_name })}><History size={14} /> History</button>{canCorrect && <button className="btn-secondary" onClick={() => setEditingRow(row)}><Pencil size={14} /> Correct</button>}</div></td></tr>)}
-                {!pageRows.length && <tr><td colSpan={6}><EmptyState compact icon={SearchX} title="No report rows found" description="Try changing the report filters." /></td></tr>}
-              </tbody>
-            </table>
-          </div>
-
-          {pageCount > 1 && <div className="flex items-center justify-between gap-3"><span className="text-sm text-slate-500">Page {page} of {pageCount} · {filteredRows.length} results</span><div className="flex gap-2"><button className="btn-secondary" disabled={page === 1} onClick={() => setPage((current) => current - 1)}>Previous</button><button className="btn-secondary" disabled={page === pageCount} onClick={() => setPage((current) => current + 1)}>Next</button></div></div>}
+          {activeTab === 'history' && (
+            <section aria-labelledby="report-tab-history" className="mx-auto max-w-3xl py-3" id="report-panel-history" role="tabpanel">
+              <div className="rounded-xl border border-slate-200 bg-white p-5 shadow-sm dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+                <div className="flex items-center gap-2"><History className="text-blue-600 dark:text-blue-400" size={19} /><h2 className="font-semibold">Student attendance history</h2></div>
+                <p className="mt-1 text-sm text-slate-500">Find a student to view attendance across completed events.</p>
+                <div className="relative mt-5"><Search className="pointer-events-none absolute left-3 top-3 text-slate-400" size={18} /><input aria-label="Search student history" className="field pl-10" disabled={studentsLoading} value={studentSearch} onChange={(event) => setStudentSearch(event.target.value)} placeholder={studentsLoading ? 'Loading students…' : 'Search Student ID or name'} /></div>
+                {studentSearch.trim().length === 1 ? <p className="mt-2 text-xs text-slate-500">Enter at least 2 characters.</p> : null}
+                {!!studentMatches.length && <div className="mt-3 divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200 dark:divide-slate-800 dark:border-slate-800">{studentMatches.map((student) => <button className="flex w-full items-center justify-between gap-3 p-3.5 text-left transition hover:bg-slate-50 dark:hover:bg-slate-800/60" key={student.id} onClick={() => { setHistoryStudent(student); setStudentSearch('') }}><span><span className="block text-sm font-medium">{student.full_name}</span><span className="text-xs text-slate-500">{student.student_number} · {student.departments?.code ?? 'Unknown'} · Year {student.year_level}</span></span><History className="shrink-0 text-slate-400" size={17} /></button>)}</div>}
+                {studentsLoaded && studentSearch.trim().length >= 2 && !studentMatches.length ? <div className="mt-4"><EmptyState compact icon={SearchX} title="No students found" description="Try another name or Student ID." /></div> : null}
+              </div>
+            </section>
+          )}
         </>
       )}
 
