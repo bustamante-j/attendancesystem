@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, CheckCircle2, LoaderCircle, Search, Users } from 'lucide-react'
+import { ArrowLeft, ArrowRight, CheckCircle2, LoaderCircle, Search } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { Alert } from '../../components/Alert'
 import { Modal } from '../../components/Modal'
@@ -38,13 +38,38 @@ function initialDraft(departmentId: string): HistoricalDraft {
 
 function SplitDateTime({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
   const [date = '', time = ''] = value.split('T')
-  return <fieldset className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/40">
-    <legend className="px-1 text-sm font-semibold">{label}</legend>
-    <div className="mt-1 grid gap-3 sm:grid-cols-[minmax(0,1.25fr)_minmax(8rem,0.75fr)]">
-      <label><span className="label text-xs">Date</span><input className="field" type="date" value={date} onChange={(event) => onChange(event.target.value ? `${event.target.value}T${time || '00:00'}` : '')} /></label>
-      <label><span className="label text-xs">Time</span><input className="field" type="time" value={time} disabled={!date} onChange={(event) => onChange(date && event.target.value ? `${date}T${event.target.value}` : value)} /></label>
-    </div>
-  </fieldset>
+  return (
+    <fieldset>
+      <legend className="label">{label}</legend>
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,1.25fr)_minmax(7rem,0.75fr)]">
+        <input
+          className="field"
+          type="date"
+          aria-label={`${label} date`}
+          value={date}
+          onChange={(event) => onChange(event.target.value ? `${event.target.value}T${time || '00:00'}` : '')}
+        />
+        <input
+          className="field"
+          type="time"
+          aria-label={`${label} time`}
+          value={time}
+          disabled={!date}
+          onChange={(event) => onChange(date && event.target.value ? `${date}T${event.target.value}` : value)}
+        />
+      </div>
+    </fieldset>
+  )
+}
+
+/** Checkbox rendered as a selectable chip, matching the event form's audience picker. */
+function ChipCheckbox({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
+  return (
+    <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border border-line px-3 text-base text-ink transition-colors hover:bg-sunken has-[:checked]:border-accent has-[:checked]:bg-accent-soft has-[:checked]:text-accent-ink">
+      <input type="checkbox" checked={checked} onChange={onChange} />
+      {label}
+    </label>
+  )
 }
 
 export function HistoricalEventModal({ departments, onClose, onCreated }: {
@@ -149,38 +174,177 @@ export function HistoricalEventModal({ departments, onClose, onCreated }: {
     }
   }
 
-  return <Modal title={step === 1 ? 'Add completed event' : `Record attendance · ${draft.name}`} onClose={onClose} size={step === 1 ? 'lg' : 'xl'} closeDisabled={saving}>
-    <div className="space-y-5">
-      <div className="flex items-center gap-3 text-sm">
-        <span className={`status-chip ${step === 1 ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'}`}>{step === 1 ? '1' : <CheckCircle2 size={14} />} Event details</span>
-        <span className={`status-chip ${step === 2 ? 'bg-blue-100 text-blue-800' : 'bg-slate-100 text-slate-500'}`}>2 Attendance roster</span>
-      </div>
-      {error && <Alert message={error} />}
+  return (
+    <Modal
+      title={step === 1 ? 'Add completed event' : 'Record attendance'}
+      description={step === 1 ? 'Backfill an event that already happened.' : draft.name}
+      onClose={onClose}
+      size={step === 1 ? 'lg' : 'xl'}
+      closeDisabled={saving}
+    >
+      <div className="space-y-5">
+        <ol className="flex items-center gap-2 text-meta">
+          <li className={`badge ${step === 1 ? 'badge-accent' : 'badge-ok'}`}>
+            {step === 1 ? '1' : <CheckCircle2 size={12} />} Event details
+          </li>
+          <li aria-hidden="true" className="h-px w-4 bg-line" />
+          <li className={`badge ${step === 2 ? 'badge-accent' : 'badge-neutral'}`}>2 Attendance roster</li>
+        </ol>
 
-      {step === 1 ? <>
-        <div className="grid gap-4 sm:grid-cols-2">
-          <label><span className="label">Event name</span><input className="field" autoFocus value={draft.name} onChange={(event) => update('name', event.target.value)} placeholder="e.g. Alumni General Assembly" /></label>
-          <label><span className="label">Venue</span><input className="field" value={draft.venue} onChange={(event) => update('venue', event.target.value)} /></label>
-          <label className="sm:col-span-2"><span className="label">Description <span className="font-normal text-slate-400">(optional)</span></span><textarea className="field" rows={2} value={draft.description} onChange={(event) => update('description', event.target.value)} /></label>
-          <SplitDateTime label="Event started" value={draft.startAt} onChange={(value) => update('startAt', value)} />
-          <SplitDateTime label="Event ended" value={draft.endAt} onChange={(value) => update('endAt', value)} />
-          <label><span className="label">Attendance mode</span><select className="field" value={draft.attendanceMode} onChange={(event) => update('attendanceMode', event.target.value as AttendanceMode)}><option value="check_in_only">Check-in only</option><option value="check_in_out">Check-in and check-out</option></select></label>
-        </div>
-        <section className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
-          <div className="mb-3 flex items-center gap-2"><Users size={18} className="text-blue-600" /><div><h3 className="font-semibold">Expected audience</h3><p className="text-xs text-slate-500">Unselected students in this audience will appear as absent.</p></div></div>
-          <fieldset><legend className="label">Departments</legend><div className="flex flex-wrap gap-2">{departments.map((department) => <label key={department.id} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 px-3 text-sm dark:border-slate-700"><input type="checkbox" checked={draft.departmentIds.includes(department.id)} onChange={() => toggleValue('departmentIds', department.id)} /> {department.code}</label>)}</div></fieldset>
-          <fieldset className="mt-4"><legend className="label">Year levels <span className="font-normal text-slate-500">(none means all)</span></legend><div className="flex flex-wrap gap-2">{[1, 2, 3, 4].map((year) => <label key={year} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 px-3 text-sm dark:border-slate-700"><input type="checkbox" checked={draft.yearLevels.includes(year)} onChange={() => toggleValue('yearLevels', year)} /> Year {year}</label>)}</div></fieldset>
-        </section>
-        <div className="flex justify-end gap-3 border-t border-slate-200 pt-4 dark:border-slate-700"><button className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={loadingStudents} onClick={continueToRoster}>{loadingStudents ? <><LoaderCircle size={16} className="animate-spin" /> Loading students…</> : <>Continue to attendance <ArrowRight size={16} /></>}</button></div>
-      </> : <>
-        <Alert tone="info" message="Check the students who attended and mark each as Present or Late. Everyone else in the selected audience will be reported as Absent." />
-        <div className="toolbar justify-between">
-          <label className="relative min-w-64 flex-1"><Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={17} /><input className="field pl-10" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search student name or ID" /></label>
-          <div className="flex items-center gap-3"><span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{selectedCount} of {eligible.length} attending</span><button className="btn-secondary" onClick={toggleVisible}>{allVisibleSelected ? 'Clear visible' : 'Select visible'}</button></div>
-        </div>
-        <div className="table-wrap max-h-[48vh] overflow-y-auto"><table><thead className="sticky top-0 z-[1]"><tr><th className="w-12">Attend</th><th>Student</th><th>Department</th><th>Year</th><th>Status</th></tr></thead><tbody>{visible.map((student) => { const status = attendance[student.id]; return <tr key={student.id}><td><input type="checkbox" checked={Boolean(status)} onChange={() => toggleStudent(student.id)} aria-label={`Select ${student.full_name}`} /></td><td><div className="font-medium">{student.full_name}</div><div className="text-xs font-mono text-slate-500">{student.student_number}</div></td><td>{student.departments?.code ?? '—'}</td><td>Year {student.year_level}</td><td><select className="field min-w-32" value={status ?? 'present'} disabled={!status} aria-label={`Attendance status for ${student.full_name}`} onChange={(event) => setAttendance((current) => ({ ...current, [student.id]: event.target.value as AttendanceStatus }))}><option value="present">Present</option><option value="late">Late</option></select></td></tr>})}{!visible.length && <tr><td colSpan={5} className="py-10 text-center text-sm text-slate-500">No students match this search.</td></tr>}</tbody></table></div>
-        <div className="flex flex-wrap justify-between gap-3 border-t border-slate-200 pt-4 dark:border-slate-700"><button className="btn-secondary" disabled={saving} onClick={() => { setStep(1); setError(null) }}><ArrowLeft size={16} /> Back</button><div className="flex gap-3"><button className="btn-secondary" disabled={saving} onClick={onClose}>Cancel</button><button className="btn-primary" disabled={saving || !selectedCount} onClick={() => void save()}>{saving ? <><LoaderCircle size={16} className="animate-spin" /> Saving…</> : 'Save completed event'}</button></div></div>
-      </>}
-    </div>
-  </Modal>
+        {error && <Alert message={error} />}
+
+        {step === 1 ? (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="label">Event name</span>
+                <input className="field" autoFocus value={draft.name} onChange={(event) => update('name', event.target.value)} placeholder="e.g. Alumni General Assembly" />
+              </label>
+              <label className="block">
+                <span className="label">Venue</span>
+                <input className="field" value={draft.venue} onChange={(event) => update('venue', event.target.value)} />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="label">Description <span className="text-subtle">(optional)</span></span>
+                <textarea className="field resize-y" rows={2} value={draft.description} onChange={(event) => update('description', event.target.value)} />
+              </label>
+              <SplitDateTime label="Event started" value={draft.startAt} onChange={(value) => update('startAt', value)} />
+              <SplitDateTime label="Event ended" value={draft.endAt} onChange={(value) => update('endAt', value)} />
+              <label className="block">
+                <span className="label">Attendance mode</span>
+                <select className="field" value={draft.attendanceMode} onChange={(event) => update('attendanceMode', event.target.value as AttendanceMode)}>
+                  <option value="check_in_only">Check-in only</option>
+                  <option value="check_in_out">Check-in and check-out</option>
+                </select>
+              </label>
+            </div>
+
+            <section className="border-t border-line pt-5">
+              <h3 className="text-base font-medium text-ink">Expected audience</h3>
+              <p className="mt-0.5 text-meta text-muted">Unselected students in this audience will appear as absent.</p>
+              <fieldset className="mt-3">
+                <legend className="label">Departments</legend>
+                <div className="flex flex-wrap gap-2">
+                  {departments.map((department) => (
+                    <ChipCheckbox
+                      key={department.id}
+                      label={department.code}
+                      checked={draft.departmentIds.includes(department.id)}
+                      onChange={() => toggleValue('departmentIds', department.id)}
+                    />
+                  ))}
+                </div>
+              </fieldset>
+              <fieldset className="mt-4">
+                <legend className="label">Year levels <span className="text-subtle">(none means all)</span></legend>
+                <div className="flex flex-wrap gap-2">
+                  {[1, 2, 3, 4].map((year) => (
+                    <ChipCheckbox
+                      key={year}
+                      label={`Year ${year}`}
+                      checked={draft.yearLevels.includes(year)}
+                      onChange={() => toggleValue('yearLevels', year)}
+                    />
+                  ))}
+                </div>
+              </fieldset>
+            </section>
+
+            <div className="flex justify-end gap-2 border-t border-line pt-4">
+              <button className="btn-secondary" onClick={onClose}>Cancel</button>
+              <button className="btn-primary" disabled={loadingStudents} onClick={continueToRoster}>
+                {loadingStudents
+                  ? <><LoaderCircle size={15} className="animate-spin" /> Loading students…</>
+                  : <>Continue to attendance <ArrowRight size={15} /></>}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <Alert tone="info" message="Check the students who attended and mark each Present or Late. Everyone else in the audience is reported Absent." />
+
+            <div className="filter-bar justify-between">
+              <label className="relative min-w-56 flex-1">
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={16} />
+                <input className="field pl-9" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search student name or ID" />
+              </label>
+              <div className="flex items-center gap-2">
+                <span className="text-base text-muted">{selectedCount} of {eligible.length} attending</span>
+                <button className="btn-secondary btn-sm" onClick={toggleVisible}>
+                  {allVisibleSelected ? 'Clear visible' : 'Select visible'}
+                </button>
+              </div>
+            </div>
+
+            <div className="table-shell">
+              <div className="max-h-[48vh] overflow-y-auto">
+                <table>
+                  <thead className="sticky top-0 z-[1]">
+                    <tr>
+                      <th className="w-10">Attend</th>
+                      <th>Student</th>
+                      <th>Department</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {visible.map((student) => {
+                      const status = attendance[student.id]
+                      return (
+                        <tr key={student.id}>
+                          <td>
+                            <input
+                              type="checkbox"
+                              checked={Boolean(status)}
+                              onChange={() => toggleStudent(student.id)}
+                              aria-label={`Select ${student.full_name}`}
+                            />
+                          </td>
+                          <td>
+                            <div className="cell-title">{student.full_name}</div>
+                            <div className="cell-meta font-mono">{student.student_number}</div>
+                          </td>
+                          <td>
+                            <div className="text-ink">{student.departments?.code ?? '—'}</div>
+                            <div className="cell-meta">Year {student.year_level}</div>
+                          </td>
+                          <td>
+                            <select
+                              className="field w-auto min-w-28"
+                              value={status ?? 'present'}
+                              disabled={!status}
+                              aria-label={`Attendance status for ${student.full_name}`}
+                              onChange={(event) => setAttendance((current) => ({ ...current, [student.id]: event.target.value as AttendanceStatus }))}
+                            >
+                              <option value="present">Present</option>
+                              <option value="late">Late</option>
+                            </select>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                    {!visible.length && (
+                      <tr><td colSpan={4} className="py-10 text-center text-muted">No students match this search.</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4">
+              <button className="btn-secondary" disabled={saving} onClick={() => { setStep(1); setError(null) }}>
+                <ArrowLeft size={15} /> Back
+              </button>
+              <div className="flex gap-2">
+                <button className="btn-secondary" disabled={saving} onClick={onClose}>Cancel</button>
+                <button className="btn-primary" disabled={saving || !selectedCount} onClick={() => void save()}>
+                  {saving ? <><LoaderCircle size={15} className="animate-spin" /> Saving…</> : 'Save completed event'}
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </Modal>
+  )
 }

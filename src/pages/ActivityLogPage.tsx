@@ -101,52 +101,115 @@ export function ActivityLogPage() {
 
   if (loading && !logs.length) return <LoadingScreen />
 
-  return <div className="space-y-5">
-    <div className="page-header">
-      <div><h1 className="page-title">Activity Log</h1><p className="page-subtitle">Review important account, student, event, and administrative actions.</p></div>
-      <div className="flex flex-wrap gap-2">
-        <button className="btn-secondary" disabled={Boolean(exporting)} onClick={() => void runExport('csv')}><Download size={16} /> {exporting === 'csv' ? 'Preparing…' : 'Export CSV'}</button>
-        <button className="btn-primary" disabled={Boolean(exporting)} onClick={() => void runExport('xlsx')}><FileSpreadsheet size={16} /> {exporting === 'xlsx' ? 'Preparing…' : 'Export Excel'}</button>
+  return (
+    <div className="page">
+      <header className="page-header">
+        <div>
+          <h1 className="page-title">Activity</h1>
+          <p className="page-subtitle">Account, student, event, and administrative changes. Retained 30 days.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button className="btn-secondary" disabled={Boolean(exporting)} onClick={() => void runExport('csv')}>
+            <Download size={15} /> {exporting === 'csv' ? 'Preparing…' : 'CSV'}
+          </button>
+          <button className="btn-secondary" disabled={Boolean(exporting)} onClick={() => void runExport('xlsx')}>
+            <FileSpreadsheet size={15} /> {exporting === 'xlsx' ? 'Preparing…' : 'Excel'}
+          </button>
+        </div>
+      </header>
+
+      {message && <Alert message={message.text} tone={message.tone} />}
+
+      <div className="filter-bar justify-between">
+        <div className="flex items-center gap-2">
+          <label className="text-base text-muted" htmlFor="activity-type">Show</label>
+          <select
+            id="activity-type"
+            className="field w-auto min-w-48"
+            value={entityType}
+            onChange={(event) => { setEntityType(event.target.value); setPage(1) }}
+          >
+            {ENTITY_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+        </div>
+        <div className="flex items-center gap-2">
+          {selected.size > 0 && (
+            <>
+              <span className="text-base text-muted">{selected.size} selected</span>
+              <button className="btn-danger btn-sm" disabled={deleting} onClick={() => void removeSelected()}>
+                <Trash2 size={14} /> {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </>
+          )}
+          <button className="icon-btn" disabled={loading} onClick={() => void load()} aria-label="Refresh activity">
+            <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+          </button>
+        </div>
+      </div>
+
+      <div className="table-shell">
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th className="w-10">
+                  <input type="checkbox" checked={allPageSelected} onChange={togglePage} aria-label="Select all activity on this page" />
+                </th>
+                <th>When</th>
+                <th>Who</th>
+                <th>Action</th>
+                <th>Record</th>
+              </tr>
+            </thead>
+            <tbody>
+              {logs.map((log) => (
+                <tr key={log.id}>
+                  <td>
+                    <input
+                      type="checkbox"
+                      checked={selected.has(log.id)}
+                      onChange={() => toggleLog(log.id)}
+                      aria-label={`Select ${auditActionLabel(log.action)} by ${auditActorName(log)}`}
+                    />
+                  </td>
+                  <td className="whitespace-nowrap align-top text-muted">{formatManilaDate(log.created_at)}</td>
+                  <td className="align-top">
+                    <div className="cell-title">{auditActorName(log)}</div>
+                    <div className="cell-meta">{auditActorRole(log)}</div>
+                  </td>
+                  <td className="align-top">
+                    <div className="text-ink">{auditActionLabel(log.action)}</div>
+                    <div className="cell-meta capitalize">{log.entity_type.replace(/_/g, ' ')}</div>
+                  </td>
+                  <td className="max-w-md align-top">
+                    <div className="text-ink">{auditRecordLabel(log)}</div>
+                    <div className="cell-meta leading-relaxed">{auditDetails(log)}</div>
+                  </td>
+                </tr>
+              ))}
+              {!logs.length && (
+                <tr>
+                  <td colSpan={5}>
+                    <EmptyState compact icon={ScrollText} title="No activity found" description="There is no retained activity for this filter yet." />
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="table-foot">
+          <span>{from}–{to} of {total.toLocaleString()}</span>
+          <div className="flex items-center gap-2">
+            <button className="btn-secondary btn-sm" disabled={page <= 1 || loading} onClick={() => setPage((value) => value - 1)}>
+              <ChevronLeft size={14} /> Previous
+            </button>
+            <span className="tabular-nums">Page {page} of {pageCount}</span>
+            <button className="btn-secondary btn-sm" disabled={page >= pageCount || loading} onClick={() => setPage((value) => value + 1)}>
+              Next <ChevronRight size={14} />
+            </button>
+          </div>
+        </div>
       </div>
     </div>
-
-    <Alert tone="info" message="Activity is visible only to the Super Admin and is automatically removed after 30 days. Exports include the current activity filter." />
-    {message && <Alert message={message.text} tone={message.tone} />}
-
-    <div className="toolbar justify-between">
-      <div className="flex flex-wrap items-center gap-3">
-        <label className="text-sm font-semibold text-slate-700 dark:text-slate-200" htmlFor="activity-type">Activity type</label>
-        <select id="activity-type" className="field min-w-52" value={entityType} onChange={(event) => { setEntityType(event.target.value); setPage(1) }}>
-          {ENTITY_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-        </select>
-      </div>
-      <div className="flex flex-wrap items-center gap-2">{selected.size > 0 && <><span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{selected.size} selected</span><button className="btn-danger" disabled={deleting} onClick={() => void removeSelected()}><Trash2 size={16} /> {deleting ? 'Deleting…' : 'Delete selected'}</button></>}<button className="btn-secondary" disabled={loading} onClick={() => void load()}><RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh</button></div>
-    </div>
-
-    <div className="table-wrap">
-      <table>
-        <thead><tr><th className="w-12"><input type="checkbox" checked={allPageSelected} onChange={togglePage} aria-label="Select all activity on this page" /></th><th>Date and time</th><th>User</th><th>Activity</th><th>Record</th><th>Details</th></tr></thead>
-        <tbody>
-          {logs.map((log) => <tr key={log.id}>
-            <td><input type="checkbox" checked={selected.has(log.id)} onChange={() => toggleLog(log.id)} aria-label={`Select ${auditActionLabel(log.action)} by ${auditActorName(log)}`} /></td>
-            <td className="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">{formatManilaDate(log.created_at)}</td>
-            <td><div className="font-medium text-slate-900 dark:text-white">{auditActorName(log)}</div><div className="text-xs text-slate-500">{auditActorRole(log)}</div></td>
-            <td><div className="font-medium">{auditActionLabel(log.action)}</div><div className="text-xs capitalize text-slate-500">{log.entity_type.replace(/_/g, ' ')}</div></td>
-            <td className="max-w-72 font-medium">{auditRecordLabel(log)}</td>
-            <td className="max-w-96 text-xs leading-5 text-slate-500 dark:text-slate-400">{auditDetails(log)}</td>
-          </tr>)}
-          {!logs.length && <tr><td colSpan={6}><EmptyState compact icon={ScrollText} title="No activity found" description="There is no retained activity for this filter yet." /></td></tr>}
-        </tbody>
-      </table>
-    </div>
-
-    <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-500 dark:text-slate-400">
-      <span>Showing {from}–{to} of {total} retained actions</span>
-      <div className="flex items-center gap-2">
-        <button className="btn-secondary" disabled={page <= 1 || loading} onClick={() => setPage((value) => value - 1)} aria-label="Previous activity page"><ChevronLeft size={16} /> Previous</button>
-        <span className="min-w-24 text-center font-medium text-slate-700 dark:text-slate-200">Page {page} of {pageCount}</span>
-        <button className="btn-secondary" disabled={page >= pageCount || loading} onClick={() => setPage((value) => value + 1)} aria-label="Next activity page">Next <ChevronRight size={16} /></button>
-      </div>
-    </div>
-  </div>
+  )
 }

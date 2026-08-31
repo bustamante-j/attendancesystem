@@ -1,11 +1,13 @@
-import { CalendarPlus, KeyRound, LockKeyhole, Pencil, Plus, RotateCcw, ShieldCheck, ShieldOff, Trash2, Users } from 'lucide-react'
+import { CalendarPlus, KeyRound, LockKeyhole, Pencil, Plus, RotateCcw, ShieldOff, Trash2, Users } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { ActionMenu } from '../components/ActionMenu'
 import { Alert } from '../components/Alert'
 import { useConfirm } from '../components/ConfirmDialog'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingScreen } from '../components/LoadingScreen'
 import { SearchInput } from '../components/SearchInput'
+import { StatusBadge } from '../components/StatusBadge'
 import { useAuth } from '../features/auth/AuthProvider'
 import { ResetPasswordModal } from '../features/users/ResetPasswordModal'
 import { UserFormModal } from '../features/users/UserFormModal'
@@ -29,6 +31,7 @@ export function UsersPage() {
   const [statusFilter, setStatusFilter] = useState('all')
   const [loading, setLoading] = useState(true)
   const [message, setMessage] = useState<{ text: string; tone: 'error' | 'success' } | null>(null)
+
   const load = useCallback(async () => {
     try {
       const [profileRows, counts] = await Promise.all([listProfiles(), listEventAssignmentCounts()])
@@ -91,17 +94,131 @@ export function UsersPage() {
   }
 
   if (loading) return <LoadingScreen />
-  return <div className="space-y-5">
-    <div className="page-header"><div><h1 className="page-title">Users</h1><p className="page-subtitle">{isSuperAdmin ? 'Manage staff identities, roles, passwords, and sessions.' : 'Manage Faculty and Officer access while the Super Admin remains protected.'}</p></div>{isSuperAdmin && <button className="btn-primary" onClick={() => { setMessage(null); setEditing(null) }}><Plus size={17} /> Create user</button>}</div>
-    {message && <Alert message={message.text} tone={message.tone} />}
-    <div className="toolbar"><SearchInput value={search} onChange={setSearch} placeholder="Search full name or username" /><select className="field max-w-48" aria-label="Filter users by role" value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}><option value="all">All roles</option><option value="super_admin">Super Admin</option><option value="admin">Admin</option><option value="faculty">Faculty</option><option value="officer">Officer</option></select><select className="field max-w-40" aria-label="Filter users by status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="enabled">Enabled</option><option value="disabled">Disabled</option></select></div>
-    <div className="table-wrap"><table><thead><tr><th>User</th><th>Username</th><th>Role</th><th>Event access</th><th>Status</th><th>Last Revocation</th><th>Actions</th></tr></thead><tbody>{filtered.map((profile) => {
-      const isProtected = profile.role === 'super_admin'
-      const adminPeer = currentProfile?.role === 'admin' && profile.role === 'admin'
-      const canDelete = !isProtected && !adminPeer && profile.id !== currentProfile?.id
-      return <tr key={profile.id}><td><div className="font-medium">{profile.full_name}</div>{profile.id === currentProfile?.id && <div className="text-xs text-blue-700">Current account</div>}</td><td className="font-mono">{profile.username}</td><td className="capitalize">{profile.role.replace('_', ' ')}</td><td>{profile.role === 'super_admin' || profile.role === 'admin' ? <span className="text-xs text-slate-500">All events</span> : <span className={`status-chip ${(assignmentCounts[profile.id] ?? 0) ? 'bg-blue-100 text-blue-800' : 'bg-amber-100 text-amber-800'}`}>{assignmentCounts[profile.id] ?? 0} assigned</span>}</td><td>{profile.is_enabled ? <span className="status-chip bg-emerald-100 text-emerald-800"><ShieldCheck size={13} /> Enabled</span> : <span className="status-chip bg-red-100 text-red-800"><ShieldOff size={13} /> Disabled</span>}</td><td className="text-xs text-slate-500">{profile.session_revoked_at ? formatManilaDate(profile.session_revoked_at) : 'Never'}</td><td><div className="flex flex-wrap gap-2">{profile.role !== 'super_admin' && profile.role !== 'admin' && <button className="btn-secondary" onClick={() => navigate(`/events?assignUser=${profile.id}`)}><CalendarPlus size={14} /> Assign events</button>}{isSuperAdmin && <><button className="btn-secondary" onClick={() => setEditing(profile)}><Pencil size={14} /> Edit</button><button className="btn-secondary" disabled={profile.id === currentProfile?.id || isProtected} onClick={() => void toggle(profile)}>{profile.is_enabled ? 'Disable' : 'Enable'}</button><button className="btn-secondary" onClick={() => setResetTarget(profile)}><KeyRound size={14} /> Password</button><button className="btn-secondary" disabled={profile.id === currentProfile?.id} onClick={() => void forceLogout(profile)}><RotateCcw size={14} /> Force logout</button></>}{canDelete && <button className="btn-danger" onClick={() => void remove(profile)} aria-label={`Delete ${profile.full_name}`}><Trash2 size={14} /> Delete</button>}{(isProtected || adminPeer || profile.id === currentProfile?.id) && <span className="status-chip bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300"><LockKeyhole size={13} /> {isProtected ? 'Protected' : profile.id === currentProfile?.id ? 'Current account' : 'Admin protected'}</span>}</div></td></tr>
-    })}{!filtered.length && <tr><td colSpan={7}><EmptyState compact icon={Users} title="No users found" description="Try changing the search or filters." /></td></tr>}</tbody></table></div>
-    {editing !== undefined && currentProfile && <UserFormModal user={editing} currentUserId={currentProfile.id} error={message?.tone === 'error' ? message.text : null} onClose={() => setEditing(undefined)} onSave={save} />}
-    {resetTarget && <ResetPasswordModal user={resetTarget} onClose={() => setResetTarget(null)} onReset={resetPassword} />}
-  </div>
+
+  return (
+    <div className="page">
+      <header className="page-header">
+        <div>
+          <h1 className="page-title">Users</h1>
+          <p className="page-subtitle">
+            {isSuperAdmin
+              ? 'Staff identities, roles, passwords, and sessions.'
+              : 'Manage Faculty and Officer access. The Super Admin stays protected.'}
+          </p>
+        </div>
+        {isSuperAdmin && <button className="btn-primary" onClick={() => { setMessage(null); setEditing(null) }}><Plus size={15} /> Create user</button>}
+      </header>
+
+      {message && <Alert message={message.text} tone={message.tone} />}
+
+      <div className="filter-bar">
+        <SearchInput value={search} onChange={setSearch} placeholder="Search name or username" />
+        <select className="field w-auto min-w-32" aria-label="Filter users by role" value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}>
+          <option value="all">All roles</option>
+          <option value="super_admin">Super Admin</option>
+          <option value="admin">Admin</option>
+          <option value="faculty">Faculty</option>
+          <option value="officer">Officer</option>
+        </select>
+        <select className="field w-auto min-w-32" aria-label="Filter users by status" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
+          <option value="all">All statuses</option>
+          <option value="enabled">Enabled</option>
+          <option value="disabled">Disabled</option>
+        </select>
+      </div>
+
+      <div className="table-shell">
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                <th>User</th>
+                <th>Role</th>
+                <th>Event access</th>
+                <th>Status</th>
+                <th className="w-12" aria-label="Actions" />
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map((profile) => {
+                const isProtected = profile.role === 'super_admin'
+                const isSelf = profile.id === currentProfile?.id
+                const adminPeer = currentProfile?.role === 'admin' && profile.role === 'admin'
+                const canDelete = !isProtected && !adminPeer && !isSelf
+                const scoped = profile.role === 'faculty' || profile.role === 'officer'
+                const assigned = assignmentCounts[profile.id] ?? 0
+                return (
+                  <tr key={profile.id}>
+                    <td>
+                      <div className="cell-title">
+                        {profile.full_name}
+                        {isSelf && <span className="ml-2 text-meta font-normal text-muted">You</span>}
+                      </div>
+                      <div className="cell-meta font-mono">{profile.username}</div>
+                    </td>
+                    <td>
+                      <span className="capitalize text-ink">{profile.role.replace('_', ' ')}</span>
+                      {isProtected && (
+                        <div className="cell-meta inline-flex items-center gap-1">
+                          <LockKeyhole size={11} /> Protected
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      {scoped
+                        ? <span className={assigned ? 'text-ink' : 'text-warn-ink'}>{assigned} event{assigned === 1 ? '' : 's'}</span>
+                        : <span className="text-muted">All events</span>}
+                    </td>
+                    <td>
+                      <StatusBadge tone={profile.is_enabled ? 'ok' : 'bad'}>{profile.is_enabled ? 'Enabled' : 'Disabled'}</StatusBadge>
+                      {profile.session_revoked_at && (
+                        <div className="cell-meta">Revoked {formatManilaDate(profile.session_revoked_at)}</div>
+                      )}
+                    </td>
+                    <td>
+                      <div className="flex justify-end">
+                        <ActionMenu
+                          label={`Actions for ${profile.full_name}`}
+                          items={[
+                            scoped && { icon: CalendarPlus, label: 'Assign events', onSelect: () => navigate(`/events?assignUser=${profile.id}`) },
+                            isSuperAdmin && scoped && 'separator',
+                            isSuperAdmin && { icon: Pencil, label: 'Edit details', onSelect: () => setEditing(profile) },
+                            isSuperAdmin && { icon: KeyRound, label: 'Reset password', onSelect: () => setResetTarget(profile) },
+                            isSuperAdmin && {
+                              icon: ShieldOff,
+                              label: profile.is_enabled ? 'Disable account' : 'Enable account',
+                              disabled: isSelf || isProtected,
+                              onSelect: () => void toggle(profile),
+                            },
+                            isSuperAdmin && {
+                              icon: RotateCcw,
+                              label: 'Force sign out',
+                              disabled: isSelf,
+                              onSelect: () => void forceLogout(profile),
+                            },
+                            canDelete && 'separator',
+                            canDelete && { icon: Trash2, label: 'Delete user', danger: true, onSelect: () => void remove(profile) },
+                          ]}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+              {!filtered.length && (
+                <tr>
+                  <td colSpan={5}>
+                    <EmptyState compact icon={Users} title="No users found" description="Try changing the search or filters." />
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {editing !== undefined && currentProfile && <UserFormModal user={editing} currentUserId={currentProfile.id} error={message?.tone === 'error' ? message.text : null} onClose={() => setEditing(undefined)} onSave={save} />}
+      {resetTarget && <ResetPasswordModal user={resetTarget} onClose={() => setResetTarget(null)} onReset={resetPassword} />}
+    </div>
+  )
 }

@@ -9,21 +9,22 @@ export function EventWorkspaceNav({ eventRecord, active, canViewReports }: {
 }) {
   const items = [
     { label: 'All events', to: '/events', icon: CalendarDays, active: false },
-    { label: 'Attendance roster', to: `/events/${eventRecord.id}/attendance`, icon: ClipboardList, active: active === 'roster' },
+    { label: 'Roster', to: `/events/${eventRecord.id}/attendance`, icon: ClipboardList, active: active === 'roster' },
     ...(!eventRecord.is_historical ? [{ label: 'Scanner', to: `/events/${eventRecord.id}/scanner`, icon: ScanLine, active: active === 'scanner' }] : []),
     ...(canViewReports ? [{ label: 'Reports', to: `/reports?event=${eventRecord.id}`, icon: BarChart3, active: false }] : []),
   ]
 
   return (
-    <nav className="event-workspace-nav" aria-label={`${eventRecord.name} workspace`}>
+    <nav className="tabs" aria-label={`${eventRecord.name} workspace`}>
       {items.map(({ label, to, icon: Icon, active: isActive }) => (
         <Link
-          aria-current={isActive ? 'page' : undefined}
-          className={`event-workspace-link ${isActive ? 'event-workspace-link-active' : ''}`}
           key={label}
           to={to}
+          aria-current={isActive ? 'page' : undefined}
+          className={`tab inline-flex items-center gap-2 ${isActive ? 'tab-active' : ''}`}
         >
-          <Icon size={16} /> {label}
+          <Icon size={15} className={isActive ? 'text-accent' : 'text-subtle'} strokeWidth={1.9} />
+          {label}
         </Link>
       ))}
     </nav>

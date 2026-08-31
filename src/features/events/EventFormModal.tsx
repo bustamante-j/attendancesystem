@@ -1,6 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { CalendarClock, Clock3, MapPin, Users } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, type ReactNode } from 'react'
 import { Controller, useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { Alert } from '../../components/Alert'
@@ -109,6 +108,17 @@ function shiftLocal(value: string, minutes: number) {
   }
 }
 
+/** Plain heading + rule, rather than a nested bordered card per group. */
+function FormSection({ title, note, children }: { title: string; note?: string; children: ReactNode }) {
+  return (
+    <section className="border-t border-line pt-5 first:border-t-0 first:pt-0">
+      <h3 className="text-base font-medium text-ink">{title}</h3>
+      {note && <p className="mt-0.5 text-meta text-muted">{note}</p>}
+      <div className="mt-3">{children}</div>
+    </section>
+  )
+}
+
 function SplitDateTimeField({ label, value, onChange, error }: {
   label: string
   value: string
@@ -120,14 +130,24 @@ function SplitDateTimeField({ label, value, onChange, error }: {
   const updateTime = (nextTime: string) => onChange(date && nextTime ? `${date}T${nextTime}` : value)
 
   return (
-    <fieldset className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/40">
-      <legend className="px-1 text-sm font-semibold text-slate-800 dark:text-slate-100">{label}</legend>
-      <div className="mt-1 grid gap-3 sm:grid-cols-[minmax(0,1.25fr)_minmax(8rem,0.75fr)]">
-        <label><span className="label text-xs">Date</span><input className="field" type="date" value={date} onChange={(event) => updateDate(event.target.value)} /></label>
-        <label><span className="label text-xs">Time</span><input className="field" type="time" value={time} disabled={!date} onChange={(event) => updateTime(event.target.value)} /></label>
+    <fieldset>
+      <legend className="label">{label}</legend>
+      <div className="grid gap-2 sm:grid-cols-[minmax(0,1.25fr)_minmax(7rem,0.75fr)]">
+        <input className="field" type="date" aria-label={`${label} date`} value={date} onChange={(event) => updateDate(event.target.value)} />
+        <input className="field" type="time" aria-label={`${label} time`} value={time} disabled={!date} onChange={(event) => updateTime(event.target.value)} />
       </div>
-      {error && <span className="mt-2 block text-xs text-red-700 dark:text-red-400">{error}</span>}
+      {error && <span className="field-error">{error}</span>}
     </fieldset>
+  )
+}
+
+/** Checkbox rendered as a selectable chip, for the audience pickers. */
+function ChipCheckbox({ label, ...input }: { label: string } & React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <label className="inline-flex min-h-9 cursor-pointer items-center gap-2 rounded-lg border border-line px-3 text-base text-ink transition-colors hover:bg-sunken has-[:checked]:border-accent has-[:checked]:bg-accent-soft has-[:checked]:text-accent-ink">
+      <input type="checkbox" {...input} />
+      {label}
+    </label>
   )
 }
 
@@ -172,8 +192,7 @@ export function EventFormModal({ event, audience, departments, duplicate = false
       setValue('end_at', '')
       return
     }
-    const calculatedEnd = shiftLocal(startAt, totalMinutes)
-    setValue('end_at', calculatedEnd)
+    setValue('end_at', shiftLocal(startAt, totalMinutes))
   }, [durationHours, durationMinutes, setValue, startAt])
 
   useEffect(() => {
@@ -208,66 +227,158 @@ export function EventFormModal({ event, audience, departments, duplicate = false
   })
 
   return (
-    <Modal title={duplicate ? 'Duplicate event' : event ? 'Edit event' : 'Create event'} onClose={onClose} size="lg" closeDisabled={isSubmitting}>
-      <form className="space-y-5" onSubmit={handleSubmit(submit)}>
-        {!!validationMessages.length && <Alert message={`Review the event details: ${validationMessages.join(' ')}`} />}
-        <section className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
-          <div className="mb-4 flex items-center gap-2"><MapPin size={18} className="text-blue-600" /><h3 className="font-semibold">Event details</h3></div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label><span className="label">Event name</span><input className="field" autoFocus placeholder="e.g. IT General Assembly" {...register('name')} />{errors.name && <span className="mt-1 block text-xs text-red-700 dark:text-red-400">{errors.name.message}</span>}</label>
-            <label><span className="label">Venue</span><input className="field" placeholder="e.g. Main Auditorium" {...register('venue')} /></label>
-            <label className="sm:col-span-2"><span className="label">Description <span className="font-normal text-slate-400">(optional)</span></span><textarea className="field" rows={2} placeholder="A short note about this event" {...register('description')} /></label>
-          </div>
-        </section>
+    <Modal
+      title={duplicate ? 'Duplicate event' : event ? 'Edit event' : 'Create event'}
+      description="All times use Asia/Manila."
+      onClose={onClose}
+      size="lg"
+      closeDisabled={isSubmitting}
+    >
+      <form onSubmit={handleSubmit(submit)}>
+        <div className="space-y-5">
+          {!!validationMessages.length && <Alert message={`Review the event details: ${validationMessages.join(' ')}`} />}
 
-        <section className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
-          <div className="mb-4 flex flex-wrap items-start justify-between gap-2">
-            <div className="flex items-center gap-2"><CalendarClock size={18} className="text-blue-600" /><div><h3 className="font-semibold">Schedule</h3><p className="text-xs text-slate-500">All times use Asia/Manila.</p></div></div>
-          </div>
-          <input type="hidden" {...register('end_at')} />
-          <div className="grid gap-4 lg:grid-cols-2">
-            <Controller control={control} name="start_at" render={({ field }) => <SplitDateTimeField label="Event starts" value={field.value} onChange={field.onChange} error={errors.start_at?.message} />} />
-            <fieldset className="rounded-xl border border-slate-200 bg-slate-50/70 p-3 dark:border-slate-700 dark:bg-slate-800/40">
-              <legend className="px-1 text-sm font-semibold text-slate-800 dark:text-slate-100">Event duration</legend>
-              <div className="mt-1 grid grid-cols-2 gap-3">
-                <label><span className="label text-xs">Hours</span><input className="field" min={0} max={8760} inputMode="numeric" type="number" {...register('duration_hours', { valueAsNumber: true })} /></label>
-                <label><span className="label text-xs">Minutes</span><input className="field" min={0} max={59} inputMode="numeric" type="number" {...register('duration_minutes', { valueAsNumber: true })} /></label>
+          <FormSection title="Details">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="label">Event name</span>
+                <input className="field" autoFocus placeholder="e.g. IT General Assembly" {...register('name')} />
+                {errors.name && <span className="field-error">{errors.name.message}</span>}
+              </label>
+              <label className="block">
+                <span className="label">Venue</span>
+                <input className="field" placeholder="e.g. Main Auditorium" {...register('venue')} />
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="label">Description <span className="text-subtle">(optional)</span></span>
+                <textarea className="field resize-y" rows={2} placeholder="A short note about this event" {...register('description')} />
+              </label>
+            </div>
+          </FormSection>
+
+          <FormSection title="Schedule" note="For multi-day events, enter the full duration in hours (72 hours for three days).">
+            <input type="hidden" {...register('end_at')} />
+            <div className="grid gap-4 lg:grid-cols-2">
+              <Controller
+                control={control}
+                name="start_at"
+                render={({ field }) => (
+                  <SplitDateTimeField label="Event starts" value={field.value} onChange={field.onChange} error={errors.start_at?.message} />
+                )}
+              />
+              <fieldset>
+                <legend className="label">Duration</legend>
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="block">
+                    <input className="field" min={0} max={8760} inputMode="numeric" type="number" aria-label="Duration hours" {...register('duration_hours', { valueAsNumber: true })} />
+                    <span className="mt-1 block text-meta text-muted">Hours</span>
+                  </label>
+                  <label className="block">
+                    <input className="field" min={0} max={59} inputMode="numeric" type="number" aria-label="Duration minutes" {...register('duration_minutes', { valueAsNumber: true })} />
+                    <span className="mt-1 block text-meta text-muted">Minutes</span>
+                  </label>
+                </div>
+                {endAt && (
+                  <p className="mt-2 text-meta text-muted">
+                    Ends <span className="text-ink">{formatManilaDate(manilaDateTimeToIso(endAt))}</span>
+                  </p>
+                )}
+                {(errors.duration_hours || errors.duration_minutes || errors.end_at) && (
+                  <span className="field-error">
+                    {errors.duration_hours?.message ?? errors.duration_minutes?.message ?? errors.end_at?.message}
+                  </span>
+                )}
+              </fieldset>
+            </div>
+          </FormSection>
+
+          <FormSection title="Attendance rules">
+            <div className="grid gap-4 sm:grid-cols-2">
+              <label className="block">
+                <span className="label">Attendance mode</span>
+                <select className="field" {...register('attendance_mode')}>
+                  <option value="check_in_only">Check-in only</option>
+                  <option value="check_in_out">Check-in and check-out</option>
+                </select>
+              </label>
+              <label className="block">
+                <span className="label">Timing</span>
+                <select className="field" value={timingPreset} onChange={(inputEvent) => setTimingPreset(inputEvent.target.value as TimingPreset)}>
+                  <option value="standard">Standard — opens 30 min early</option>
+                  <option value="strict">Strict — opens at event start</option>
+                  <option value="custom">Advanced — custom times</option>
+                </select>
+              </label>
+            </div>
+
+            {timingPreset !== 'custom' ? (
+              <p className="mt-3 rounded-lg border border-line bg-sunken px-3 py-2.5 text-meta text-muted">
+                {timingPreset === 'standard'
+                  ? 'Check-in opens 30 minutes early, marks late after 15 minutes, and closes after 1 hour.'
+                  : 'Check-in opens at the start, marks late after 10 minutes, and closes after 30 minutes.'}
+                {mode === 'check_in_out' && ' Check-out opens shortly before the event ends and remains open afterward.'}
+              </p>
+            ) : (
+              <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                <label className="block">
+                  <span className="label">Check-in opens</span>
+                  <input className="field" type="datetime-local" {...register('check_in_opens_at')} />
+                </label>
+                <label className="block">
+                  <span className="label">Late after</span>
+                  <input className="field" type="datetime-local" {...register('late_after')} />
+                  {errors.late_after && <span className="field-error">{errors.late_after.message}</span>}
+                </label>
+                <label className="block">
+                  <span className="label">Check-in closes</span>
+                  <input className="field" type="datetime-local" {...register('check_in_closes_at')} />
+                  {errors.check_in_closes_at && <span className="field-error">{errors.check_in_closes_at.message}</span>}
+                </label>
+                {mode === 'check_in_out' && (
+                  <>
+                    <label className="block">
+                      <span className="label">Check-out opens</span>
+                      <input className="field" type="datetime-local" {...register('check_out_opens_at')} />
+                      {errors.check_out_opens_at && <span className="field-error">{errors.check_out_opens_at.message}</span>}
+                    </label>
+                    <label className="block">
+                      <span className="label">Check-out closes</span>
+                      <input className="field" type="datetime-local" {...register('check_out_closes_at')} />
+                      {errors.check_out_closes_at && <span className="field-error">{errors.check_out_closes_at.message}</span>}
+                    </label>
+                  </>
+                )}
               </div>
-              {endAt ? <div className="mt-3 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-xs text-blue-900 dark:border-blue-900 dark:bg-blue-950/50 dark:text-blue-200"><span className="font-semibold">Calculated end:</span> {formatManilaDate(manilaDateTimeToIso(endAt))}</div> : null}
-              {(errors.duration_hours || errors.duration_minutes || errors.end_at) && <span className="mt-2 block text-xs text-red-700 dark:text-red-400">{errors.duration_hours?.message ?? errors.duration_minutes?.message ?? errors.end_at?.message}</span>}
+            )}
+          </FormSection>
+
+          <FormSection title="Audience" note="Choose who is expected to attend.">
+            <fieldset>
+              <legend className="label">Departments</legend>
+              <div className="flex flex-wrap gap-2">
+                {departments.map((department) => (
+                  <ChipCheckbox key={department.id} label={department.code} value={department.id} {...register('department_ids')} />
+                ))}
+              </div>
+              {errors.department_ids && <span className="field-error">{errors.department_ids.message}</span>}
             </fieldset>
-          </div>
-          <p className="mt-3 text-xs text-slate-500">For multi-day events, enter the full duration in hours (for example, 72 hours for three days).</p>
-        </section>
+            <fieldset className="mt-4">
+              <legend className="label">Year levels <span className="text-subtle">(none means all)</span></legend>
+              <div className="flex flex-wrap gap-2">
+                {[1, 2, 3, 4].map((year) => (
+                  <ChipCheckbox key={year} label={`Year ${year}`} value={year} {...register('year_levels', { valueAsNumber: true })} />
+                ))}
+              </div>
+            </fieldset>
+          </FormSection>
+        </div>
 
-        <section className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
-          <div className="mb-4 flex items-center gap-2"><Clock3 size={18} className="text-blue-600" /><div><h3 className="font-semibold">Attendance rules</h3><p className="text-xs text-slate-500">Choose a preset or set exact attendance windows.</p></div></div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <label><span className="label">Attendance mode</span><select className="field" {...register('attendance_mode')}><option value="check_in_only">Check-in only</option><option value="check_in_out">Check-in and check-out</option></select></label>
-            <label><span className="label">Timing</span><select className="field" value={timingPreset} onChange={(inputEvent) => setTimingPreset(inputEvent.target.value as TimingPreset)}><option value="standard">Standard — opens 30 min early</option><option value="strict">Strict — opens at event start</option><option value="custom">Advanced — custom times</option></select></label>
-          </div>
-          {timingPreset !== 'custom' ? (
-            <div className="mt-4 rounded-xl bg-blue-50 p-3 text-sm text-blue-900 dark:bg-blue-950/50 dark:text-blue-200">
-              {timingPreset === 'standard' ? 'Check-in opens 30 minutes early, marks late after 15 minutes, and closes after 1 hour.' : 'Check-in opens at the start, marks late after 10 minutes, and closes after 30 minutes.'}
-              {mode === 'check_in_out' && ' Check-out opens shortly before the event ends and remains open afterward.'}
-            </div>
-          ) : (
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              <label><span className="label">Check-in opens</span><input className="field" type="datetime-local" {...register('check_in_opens_at')} /></label>
-              <label><span className="label">Late after</span><input className="field" type="datetime-local" {...register('late_after')} />{errors.late_after && <span className="mt-1 block text-xs text-red-700 dark:text-red-400">{errors.late_after.message}</span>}</label>
-              <label><span className="label">Check-in closes</span><input className="field" type="datetime-local" {...register('check_in_closes_at')} />{errors.check_in_closes_at && <span className="mt-1 block text-xs text-red-700 dark:text-red-400">{errors.check_in_closes_at.message}</span>}</label>
-              {mode === 'check_in_out' && <><label><span className="label">Check-out opens</span><input className="field" type="datetime-local" {...register('check_out_opens_at')} />{errors.check_out_opens_at && <span className="mt-1 block text-xs text-red-700 dark:text-red-400">{errors.check_out_opens_at.message}</span>}</label><label><span className="label">Check-out closes</span><input className="field" type="datetime-local" {...register('check_out_closes_at')} />{errors.check_out_closes_at && <span className="mt-1 block text-xs text-red-700 dark:text-red-400">{errors.check_out_closes_at.message}</span>}</label></>}
-            </div>
-          )}
-        </section>
-
-        <section className="rounded-2xl border border-slate-200 p-4 dark:border-slate-700">
-          <div className="mb-4 flex items-center gap-2"><Users size={18} className="text-blue-600" /><div><h3 className="font-semibold">Audience</h3><p className="text-xs text-slate-500">Choose who is expected to attend.</p></div></div>
-          <fieldset><legend className="label">Departments</legend><div className="flex flex-wrap gap-3">{departments.map((department) => <label key={department.id} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 px-3 text-sm transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"><input type="checkbox" value={department.id} {...register('department_ids')} /> {department.code}</label>)}</div>{errors.department_ids && <span className="mt-1 block text-xs text-red-700 dark:text-red-400">{errors.department_ids.message}</span>}</fieldset>
-          <fieldset className="mt-4"><legend className="label">Year levels <span className="font-normal text-slate-500">(none means all)</span></legend><div className="flex flex-wrap gap-3">{[1, 2, 3, 4].map((year) => <label key={year} className="inline-flex min-h-10 items-center gap-2 rounded-xl border border-slate-200 px-3 text-sm transition hover:bg-slate-50 dark:border-slate-700 dark:hover:bg-slate-800"><input type="checkbox" value={year} {...register('year_levels', { valueAsNumber: true })} /> Year {year}</label>)}</div></fieldset>
-        </section>
-
-        <div className="sticky bottom-0 flex justify-end gap-3 border-t border-slate-200 bg-white/95 pt-4 backdrop-blur dark:border-slate-700 dark:bg-slate-900/95"><button type="button" className="btn-secondary" onClick={onClose}>Cancel</button><button className="btn-primary" disabled={isSubmitting}>{isSubmitting ? 'Saving…' : duplicate ? 'Create duplicate draft' : event ? 'Save event' : 'Create draft event'}</button></div>
+        <div className="sticky bottom-0 -mx-5 -mb-5 mt-6 flex justify-end gap-2 border-t border-line bg-surface/95 px-5 py-4 backdrop-blur">
+          <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
+          <button className="btn-primary" disabled={isSubmitting}>
+            {isSubmitting ? 'Saving…' : duplicate ? 'Create duplicate draft' : event ? 'Save event' : 'Create draft event'}
+          </button>
+        </div>
       </form>
     </Modal>
   )

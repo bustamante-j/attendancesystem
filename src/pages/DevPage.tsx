@@ -36,23 +36,69 @@ export function DevPage() {
   }
 
   return (
-    <div className="space-y-6">
-      <div><h1 className="text-2xl font-bold">Development Tools</h1><p className="mt-1 text-sm text-slate-500">Development-only backend verification. This route is omitted from production navigation.</p></div>
+    <div className="page">
+      <header className="page-header">
+        <div>
+          <h1 className="page-title">Development tools</h1>
+          <p className="page-subtitle">Backend verification. Omitted from production navigation.</p>
+        </div>
+      </header>
+
       {error && <Alert message={error} />}
-      <div className="panel">
-        <h2 className="font-semibold">Current session</h2>
-        <dl className="mt-3 grid gap-2 text-sm md:grid-cols-2"><div><dt className="text-slate-500">Auth user</dt><dd className="font-mono">{session?.user.id}</dd></div><div><dt className="text-slate-500">Profile</dt><dd>{profile?.username} — {profile?.role}</dd></div></dl>
-      </div>
-      <div className="panel">
-        <h2 className="font-semibold">Event PIN test</h2>
-        <div className="mt-3 flex flex-wrap gap-3"><select className="field max-w-md" value={eventId} onChange={(event) => setEventId(event.target.value)}>{events.map((event) => <option key={event.id} value={event.id}>{event.name} ({event.status})</option>)}</select><input className="field max-w-40" placeholder="6-digit PIN" inputMode="numeric" maxLength={6} value={pin} onChange={(event) => setPin(event.target.value.replace(/\D/g, ''))} /><button className="btn-secondary" onClick={() => void verifyPin()}>Verify PIN</button></div>
-      </div>
-      <div className="panel">
-        <h2 className="font-semibold">Attendance RPC test</h2>
-        <p className="mt-1 text-sm text-slate-500">Paste the one-time raw credential shown after issuing a student's QR credential.</p>
-        <div className="mt-3 grid gap-3 md:grid-cols-[1fr_180px_auto]"><input className="field" placeholder="ATTENDLY_… credential" value={credential} onChange={(event) => setCredential(event.target.value)} /><select className="field" value={direction} onChange={(event) => setDirection(event.target.value as 'check_in' | 'check_out')}><option value="check_in">Check in</option><option value="check_out">Check out</option></select><button className="btn-primary" onClick={() => void scan()}>Process test scan</button></div>
-      </div>
-      {result !== null && <div className="panel"><h2 className="font-semibold">RPC result</h2><pre className="mt-3 overflow-auto rounded bg-slate-950 p-4 text-xs text-slate-100">{JSON.stringify(result, null, 2)}</pre></div>}
+
+      <section className="surface p-5">
+        <h2 className="section-title">Current session</h2>
+        <dl className="mt-3 grid gap-3 md:grid-cols-2">
+          <div>
+            <dt className="stat-label">Auth user</dt>
+            <dd className="mt-0.5 break-all font-mono text-meta text-ink">{session?.user.id}</dd>
+          </div>
+          <div>
+            <dt className="stat-label">Profile</dt>
+            <dd className="mt-0.5 text-ink">{profile?.username} — {profile?.role}</dd>
+          </div>
+        </dl>
+      </section>
+
+      <section className="surface p-5">
+        <h2 className="section-title">Event PIN test</h2>
+        <div className="mt-3 flex flex-wrap gap-2">
+          <select className="field max-w-md" value={eventId} onChange={(event) => setEventId(event.target.value)}>
+            {events.map((event) => <option key={event.id} value={event.id}>{event.name} ({event.status})</option>)}
+          </select>
+          <input
+            className="field max-w-36"
+            placeholder="6-digit PIN"
+            inputMode="numeric"
+            maxLength={6}
+            value={pin}
+            onChange={(event) => setPin(event.target.value.replace(/\D/g, ''))}
+          />
+          <button className="btn-secondary" onClick={() => void verifyPin()}>Verify PIN</button>
+        </div>
+      </section>
+
+      <section className="surface p-5">
+        <h2 className="section-title">Attendance RPC test</h2>
+        <p className="section-note">Paste the one-time raw credential shown after issuing a student's QR credential.</p>
+        <div className="mt-3 grid gap-2 md:grid-cols-[1fr_11rem_auto]">
+          <input className="field" placeholder="ATTENDLY_… credential" value={credential} onChange={(event) => setCredential(event.target.value)} />
+          <select className="field" value={direction} onChange={(event) => setDirection(event.target.value as 'check_in' | 'check_out')}>
+            <option value="check_in">Check in</option>
+            <option value="check_out">Check out</option>
+          </select>
+          <button className="btn-primary" onClick={() => void scan()}>Process test scan</button>
+        </div>
+      </section>
+
+      {result !== null && (
+        <section className="surface p-5">
+          <h2 className="section-title">RPC result</h2>
+          <pre className="mt-3 overflow-auto rounded-lg border border-line bg-sunken p-4 text-meta text-ink">
+            {JSON.stringify(result, null, 2)}
+          </pre>
+        </section>
+      )}
     </div>
   )
 }

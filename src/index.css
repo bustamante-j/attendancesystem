@@ -1,70 +1,406 @@
+@import '@fontsource-variable/inter/index.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
+/*
+  Design tokens.
+
+  Colours are stored as bare "R G B" triplets so Tailwind can apply opacity
+  modifiers (bg-surface/60). Light is the base; dark only overrides the same
+  names, so no rule ever needs a dark: variant to stay correct.
+*/
 @layer base {
   :root {
-    font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-    font-synthesis: none;
+    --canvas: 250 250 251;
+    --surface: 255 255 255;
+    --sunken: 246 247 249;
+    --line: 229 231 236;
+    --line-strong: 211 215 222;
+
+    --ink: 21 23 28;
+    --muted: 90 96 107;
+    --subtle: 133 139 150;
+
+    --accent: 37 99 235;
+    --accent-hover: 29 78 216;
+    --accent-soft: 239 244 255;
+    --accent-ink: 29 78 216;
+
+    --ok: 16 137 96;
+    --ok-soft: 236 250 243;
+    --ok-ink: 4 108 74;
+
+    --warn: 190 128 12;
+    --warn-soft: 254 248 233;
+    --warn-ink: 146 94 8;
+
+    --bad: 208 61 61;
+    --bad-soft: 254 242 242;
+    --bad-ink: 176 42 42;
+
+    /* The sidebar keeps its dark brand surface in both themes, so these do not
+       flip with the rest of the palette. */
+    --sidebar: 15 18 26;
+    --sidebar-ink: 244 246 250;
+    --sidebar-muted: 148 158 175;
+    --sidebar-line: 38 44 56;
+
+    color-scheme: light;
+  }
+
+  .dark {
+    --canvas: 11 13 17;
+    --surface: 19 23 30;
+    --sunken: 15 18 24;
+    --line: 35 41 52;
+    --line-strong: 49 56 70;
+
+    --ink: 233 236 241;
+    --muted: 153 162 177;
+    --subtle: 111 120 136;
+
+    --accent: 59 130 246;
+    --accent-hover: 96 165 250;
+    --accent-soft: 19 32 57;
+    --accent-ink: 147 197 253;
+
+    --ok: 52 189 138;
+    --ok-soft: 8 40 31;
+    --ok-ink: 110 231 183;
+
+    --warn: 226 165 48;
+    --warn-soft: 45 33 10;
+    --warn-ink: 252 211 129;
+
+    --bad: 233 100 100;
+    --bad-soft: 47 20 20;
+    --bad-ink: 252 165 165;
+
+    color-scheme: dark;
   }
 
   html {
-    @apply scroll-smooth bg-slate-50;
-  }
-
-  html.dark {
-    @apply bg-slate-950;
+    @apply bg-canvas;
   }
 
   body {
-    @apply m-0 bg-slate-50 text-slate-900 antialiased transition-colors duration-200 dark:bg-slate-950 dark:text-slate-100;
-    background-image: radial-gradient(circle at 88% -8%, rgb(59 130 246 / 0.09), transparent 32rem);
-    background-attachment: fixed;
+    @apply m-0 bg-canvas text-base text-ink antialiased;
+    font-synthesis: none;
+    text-rendering: optimizeLegibility;
   }
 
-  html.dark body {
-    background-image: radial-gradient(circle at 88% -8%, rgb(37 99 235 / 0.14), transparent 34rem);
+  /* Headings inherit weight deliberately rather than relying on browser defaults. */
+  h1, h2, h3, h4 {
+    @apply font-semibold text-ink;
   }
 
-  button,
-  input,
-  select,
-  textarea {
-    @apply text-sm;
+  button, input, select, textarea {
+    @apply font-sans text-base;
   }
 
-  button,
-  a,
-  input,
-  select,
-  textarea {
-    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-white dark:focus-visible:ring-offset-slate-950;
+  :where(button, a, input, select, textarea, [tabindex]):focus-visible {
+    @apply outline-none ring-2 ring-accent/70 ring-offset-2 ring-offset-canvas;
   }
 
-  input[type='checkbox'],
-  input[type='radio'] {
-    @apply h-4 w-4 accent-blue-600;
+  input[type='checkbox'], input[type='radio'] {
+    @apply h-4 w-4 rounded border-line-strong accent-accent;
   }
 
   ::selection {
-    @apply bg-blue-200 text-blue-950 dark:bg-blue-800 dark:text-white;
+    @apply bg-accent/20 text-ink;
+  }
+
+  /* Quiet, thin scrollbars keep dense tables from gaining a heavy chrome edge. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: rgb(var(--line-strong)) transparent;
+  }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb {
+    background-color: rgb(var(--line-strong));
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: 999px;
   }
 }
 
+@layer components {
+  /* ---------------------------------------------------------------- surfaces
+     One flat surface treatment. Shadows are reserved for overlays, so nothing
+     on the page competes for depth and the eye can follow content instead. */
+  .surface {
+    @apply rounded-2xl border border-line bg-surface;
+  }
+
+  .surface-quiet {
+    @apply rounded-2xl border border-line bg-sunken;
+  }
+
+  /* Section heading inside a surface. */
+  .surface-head {
+    @apply flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-4;
+  }
+
+  .section-title {
+    @apply text-lg font-semibold text-ink;
+  }
+
+  .section-note {
+    @apply mt-0.5 text-meta text-muted;
+  }
+
+  /* ------------------------------------------------------------------ forms */
+  .field {
+    @apply w-full rounded-lg border border-line-strong bg-surface px-3 py-2 text-base text-ink
+           transition-colors placeholder:text-subtle
+           hover:border-subtle focus:border-accent focus:outline-none focus:ring-2 focus:ring-accent/25
+           disabled:cursor-not-allowed disabled:bg-sunken disabled:text-subtle;
+  }
+
+  select.field {
+    @apply cursor-pointer pr-8;
+  }
+
+  .label {
+    @apply mb-1.5 block text-meta font-medium text-muted;
+  }
+
+  .field-error {
+    @apply mt-1.5 block text-meta text-bad-ink;
+  }
+
+  /* ---------------------------------------------------------------- buttons
+     Only the primary action carries fill. Everything else is a quiet outline
+     or bare text, which is what stops action columns reading as a wall. */
+  .btn {
+    @apply inline-flex min-h-9 select-none items-center justify-center gap-1.5 whitespace-nowrap
+           rounded-lg px-3 text-base font-medium transition-colors
+           disabled:pointer-events-none disabled:opacity-45;
+  }
+
+  .btn-primary {
+    @apply btn bg-accent text-white hover:bg-accent-hover;
+  }
+
+  .btn-secondary {
+    @apply btn border border-line-strong bg-surface text-ink hover:border-subtle hover:bg-sunken;
+  }
+
+  .btn-danger {
+    @apply btn bg-bad text-white hover:brightness-95;
+  }
+
+  .btn-ghost {
+    @apply btn text-muted hover:bg-sunken hover:text-ink;
+  }
+
+  .btn-sm {
+    @apply min-h-8 rounded-md px-2.5 text-meta;
+  }
+
+  .icon-btn {
+    @apply inline-grid h-9 w-9 shrink-0 place-items-center rounded-lg text-muted
+           transition-colors hover:bg-sunken hover:text-ink disabled:pointer-events-none disabled:opacity-45;
+  }
+
+  /* ----------------------------------------------------------------- tables
+     A table is a single bordered surface: no shadow, no inner cards, one
+     divider weight. Headers are quiet labels, not shouting uppercase bars. */
+  .table-shell {
+    @apply overflow-hidden rounded-2xl border border-line bg-surface;
+  }
+
+  .table-scroll {
+    @apply overflow-x-auto;
+  }
+
+  table {
+    @apply w-full border-collapse text-left text-base;
+  }
+
+  thead th {
+    @apply whitespace-nowrap border-b border-line bg-sunken px-4 py-2.5
+           text-meta font-medium text-muted;
+  }
+
+  tbody td {
+    @apply border-b border-line/70 px-4 py-3 align-middle text-ink;
+  }
+
+  tbody tr:last-child td {
+    @apply border-b-0;
+  }
+
+  tbody tr {
+    @apply transition-colors;
+  }
+
+  tbody tr:hover {
+    @apply bg-sunken/60;
+  }
+
+  .table-foot {
+    @apply flex flex-wrap items-center justify-between gap-3 border-t border-line px-4 py-2.5 text-meta text-muted;
+  }
+
+  .table-sort {
+    @apply inline-flex items-center gap-1 text-meta font-medium text-muted transition-colors hover:text-ink;
+  }
+
+  /* Row identity: a strong name with quiet metadata beneath reads far faster
+     than the same fields spread across four separate columns. */
+  .cell-title {
+    @apply font-medium text-ink;
+  }
+
+  .cell-meta {
+    @apply mt-0.5 text-meta text-muted;
+  }
+
+  .cell-mono {
+    @apply font-mono text-meta text-muted;
+  }
+
+  /* ------------------------------------------------------------------ pages */
+  .page {
+    @apply space-y-6;
+  }
+
+  .page-header {
+    @apply flex flex-wrap items-start justify-between gap-x-4 gap-y-3;
+  }
+
+  .page-title {
+    @apply text-2xl font-semibold tracking-tight text-ink;
+  }
+
+  .page-subtitle {
+    @apply mt-1 text-base text-muted;
+  }
+
+  /* Filters sit directly on the canvas as a bare row - boxing them created a
+     second competing surface above every table. */
+  .filter-bar {
+    @apply flex flex-wrap items-center gap-2;
+  }
+
+  /* --------------------------------------------------------------- badges
+     Low-saturation, single weight. Dozens of these appear per screen, so they
+     must read as annotation rather than as buttons. */
+  .badge {
+    @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-2 py-0.5
+           text-meta font-medium;
+  }
+
+  .badge-neutral { @apply bg-sunken text-muted; }
+  .badge-ok      { @apply bg-ok-soft text-ok-ink; }
+  .badge-warn    { @apply bg-warn-soft text-warn-ink; }
+  .badge-bad     { @apply bg-bad-soft text-bad-ink; }
+  .badge-accent  { @apply bg-accent-soft text-accent-ink; }
+
+  .dot {
+    @apply inline-block h-1.5 w-1.5 shrink-0 rounded-full;
+  }
+
+  /* ------------------------------------------------------------- statistics
+     Stats are a divided strip, not four floating cards. The 1px gap over a
+     line-coloured background draws perfect dividers at any column count. */
+  .stat-strip {
+    @apply grid gap-px overflow-hidden rounded-2xl border border-line bg-line;
+  }
+
+  .stat {
+    @apply bg-surface px-4 py-3.5;
+  }
+
+  .stat-label {
+    @apply text-meta font-medium text-muted;
+  }
+
+  .stat-value {
+    @apply mt-1 text-3xl font-semibold tabular-nums tracking-tight text-ink;
+  }
+
+  /* ------------------------------------------------------------------- tabs */
+  .tabs {
+    @apply flex gap-4 overflow-x-auto border-b border-line;
+  }
+
+  .tab {
+    @apply -mb-px shrink-0 border-b-2 border-transparent pb-2.5 pt-1 text-base font-medium
+           text-muted transition-colors hover:text-ink;
+  }
+
+  .tab-active {
+    @apply border-accent text-ink;
+  }
+
+  /* --------------------------------------------------------------- segmented */
+  .segmented {
+    @apply inline-flex rounded-lg border border-line bg-sunken p-0.5;
+  }
+
+  .segmented-item {
+    @apply inline-flex min-h-8 items-center justify-center gap-1.5 rounded-md px-3
+           text-meta font-medium text-muted transition-colors hover:text-ink;
+  }
+
+  .segmented-item-active {
+    @apply bg-surface text-ink shadow-sm;
+  }
+
+  /* ----------------------------------------------------------------- menus */
+  .menu {
+    @apply min-w-48 rounded-xl border border-line bg-surface p-1 shadow-overlay;
+  }
+
+  .menu-item {
+    @apply flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left text-base
+           text-ink transition-colors hover:bg-sunken
+           disabled:pointer-events-none disabled:text-subtle;
+  }
+
+  .menu-item-danger {
+    @apply text-bad-ink hover:bg-bad-soft;
+  }
+
+  .menu-separator {
+    @apply my-1 h-px bg-line;
+  }
+
+  .menu-label {
+    @apply px-2.5 pb-1 pt-2 text-micro font-semibold uppercase tracking-wider text-subtle;
+  }
+
+  /* ------------------------------------------------------------------ misc */
+  .link {
+    @apply font-medium text-accent-ink underline-offset-2 hover:underline;
+  }
+
+  .meter {
+    @apply h-1.5 overflow-hidden rounded-full bg-line;
+  }
+
+  .meter-fill {
+    @apply h-full rounded-full bg-accent transition-[width] duration-300;
+  }
+
+  .kbd-pin {
+    @apply text-center font-mono text-2xl font-semibold tracking-[0.35em];
+  }
+}
+
+/* Print: only the QR card sheet should reach paper. */
 @media print {
-  @page {
-    size: A4 portrait;
-    margin: 12mm;
-  }
+  @page { size: A4 portrait; margin: 12mm; }
 
-  body * {
-    visibility: hidden;
-  }
+  body * { visibility: hidden; }
 
-  .qr-print-area,
-  .qr-print-area * {
-    visibility: visible;
-  }
+  .qr-print-area, .qr-print-area * { visibility: visible; }
 
   .qr-print-area {
     position: absolute;
@@ -74,264 +410,22 @@
     gap: 8mm;
   }
 
-  .qr-print-card {
-    page-break-inside: avoid;
-  }
-
-  .no-print {
-    display: none !important;
-  }
+  .qr-print-card { page-break-inside: avoid; }
+  .no-print { display: none !important; }
 }
 
-@layer components {
-  .panel {
-    @apply rounded-2xl border border-slate-200/90 bg-white p-5 transition-colors dark:border-slate-800 dark:bg-slate-900;
-    box-shadow: 0 1px 2px rgb(15 23 42 / 0.05), 0 18px 38px -30px rgb(15 23 42 / 0.42);
-  }
-
-  .dark .panel {
-    box-shadow: 0 1px 2px rgb(0 0 0 / 0.28), 0 20px 42px -32px rgb(0 0 0 / 0.8);
-  }
-
-  .field {
-    @apply w-full rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-slate-900 shadow-sm outline-none transition placeholder:text-slate-400 hover:border-slate-400 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500 dark:hover:border-slate-600 dark:focus:border-blue-500 dark:focus:ring-blue-950;
-  }
-
-  .label {
-    @apply mb-1.5 block text-sm font-medium text-slate-700 dark:text-slate-300;
-  }
-
-  .btn {
-    @apply inline-flex min-h-10 items-center justify-center gap-2 rounded-xl px-3.5 py-2 text-sm font-semibold transition duration-150 disabled:cursor-not-allowed disabled:opacity-50;
-  }
-
-  .btn-primary {
-    @apply btn bg-blue-600 text-white shadow-md shadow-blue-900/20 hover:-translate-y-px hover:bg-blue-700 hover:shadow-lg hover:shadow-blue-900/20 active:translate-y-0 active:shadow-sm dark:bg-blue-500 dark:hover:bg-blue-400;
-  }
-
-  .btn-secondary {
-    @apply btn border border-slate-300 bg-white text-slate-700 shadow-sm hover:-translate-y-px hover:bg-slate-50 active:translate-y-0 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800;
-  }
-
-  .btn-danger {
-    @apply btn bg-red-600 text-white shadow-sm hover:-translate-y-px hover:bg-red-700 active:translate-y-0 dark:bg-red-600 dark:hover:bg-red-500;
-  }
-
-  .btn-ghost {
-    @apply btn text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white;
-  }
-
-  .icon-btn {
-    @apply inline-flex h-10 w-10 items-center justify-center rounded-xl text-slate-500 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-white;
-  }
-
-  .table-wrap {
-    @apply overflow-x-auto rounded-2xl border border-slate-200/90 bg-white dark:border-slate-800 dark:bg-slate-900;
-    box-shadow: 0 1px 2px rgb(15 23 42 / 0.04), 0 18px 38px -30px rgb(15 23 42 / 0.38);
-  }
-
-  table {
-    @apply w-full min-w-[720px] border-collapse text-left text-sm;
-  }
-
-  th {
-    @apply whitespace-nowrap border-b border-slate-200 bg-slate-50/95 px-4 py-3 text-xs font-bold uppercase tracking-wide text-slate-500 backdrop-blur dark:border-slate-800 dark:bg-slate-900/95 dark:text-slate-400;
-  }
-
-  td {
-    @apply border-b border-slate-100 px-4 py-3.5 align-top dark:border-slate-800/80;
-  }
-
-  tbody tr {
-    @apply transition-colors hover:bg-slate-50/70 dark:hover:bg-slate-800/40;
-  }
-
-  tbody tr:last-child td {
-    @apply border-b-0;
-  }
-
-  .page-header {
-    @apply flex flex-wrap items-start justify-between gap-4;
-  }
-
-  .page-title {
-    @apply text-2xl font-bold tracking-tight text-slate-950 dark:text-white sm:text-3xl;
-  }
-
-  .page-subtitle {
-    @apply mt-1 text-sm leading-6 text-slate-500 dark:text-slate-400;
-  }
-
-  .toolbar {
-    @apply panel flex flex-wrap items-center gap-3 p-4;
-  }
-
-  .status-chip {
-    @apply inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-xs font-semibold;
-  }
-
-  .event-workspace-nav {
-    @apply flex gap-1 overflow-x-auto border-b border-slate-200 dark:border-slate-800;
-    scrollbar-width: thin;
-  }
-
-  .event-workspace-link {
-    @apply inline-flex min-h-11 shrink-0 items-center gap-2 border-b-2 border-transparent px-3 py-2 text-sm font-semibold text-slate-500 transition hover:border-slate-300 hover:text-slate-900 dark:text-slate-400 dark:hover:border-slate-600 dark:hover:text-white;
-  }
-
-  .event-workspace-link-active {
-    @apply border-blue-600 text-blue-700 hover:border-blue-600 hover:text-blue-700 dark:border-blue-400 dark:text-blue-300 dark:hover:border-blue-400 dark:hover:text-blue-300;
-  }
-
-  .roster-metric {
-    @apply flex min-h-24 items-center justify-between gap-4 border-b border-r border-slate-200 p-4 sm:p-5 dark:border-slate-800;
-  }
-
-  .roster-metric:nth-child(2n) {
-    @apply border-r-0;
-  }
-
-  .roster-metric:nth-child(n+3) {
-    @apply border-b-0;
-  }
-
-  .roster-surface {
-    @apply overflow-hidden rounded-2xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900;
-    box-shadow: 0 1px 2px rgb(15 23 42 / 0.05), 0 20px 42px -34px rgb(15 23 42 / 0.45);
-  }
-
-  .roster-toolbar {
-    @apply flex flex-wrap items-center gap-2 border-b border-slate-200 p-4 dark:border-slate-800;
-  }
-
-  .roster-filter {
-    @apply w-full sm:w-32;
-  }
-
-  .roster-filter-sex {
-    @apply w-full sm:w-28;
-  }
-
-  .roster-filter-department {
-    @apply w-full sm:w-36;
-  }
-
-  .roster-bulk-bar {
-    @apply flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50/80 px-4 py-3 dark:border-slate-800 dark:bg-slate-950/40;
-  }
-
-  .roster-bulk-bar-active {
-    @apply bg-blue-50/80 dark:bg-blue-950/40;
-  }
-
-  .roster-bulk-button {
-    @apply inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-bold shadow-sm transition hover:-translate-y-px hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800;
-  }
-
-  .roster-table {
-    @apply min-w-[1180px];
-  }
-
-  .roster-table th {
-    @apply sticky top-0 z-[1] py-3.5;
-  }
-
-  .roster-table td {
-    @apply align-middle;
-  }
-
-  .table-sort-button {
-    @apply inline-flex items-center gap-1.5 text-left text-xs font-bold uppercase tracking-wide text-slate-500 transition hover:text-slate-900 dark:text-slate-400 dark:hover:text-white;
-  }
-
-  .roster-row-selected {
-    @apply bg-blue-50/70 dark:bg-blue-950/30;
-  }
-
-  .roster-footer {
-    @apply flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-xs text-slate-500 dark:border-slate-800 dark:text-slate-400;
-  }
-
-  .attendee-mode-button {
-    @apply inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold text-slate-600 transition sm:flex-none dark:text-slate-300;
-  }
-
-  .attendee-mode-button-active {
-    @apply bg-white text-blue-700 shadow-sm dark:bg-slate-950 dark:text-blue-300;
-  }
-
-  .report-table th {
-    @apply text-sm font-semibold normal-case tracking-normal text-slate-700 dark:text-slate-300;
-  }
+@keyframes overlay-in {
+  from { opacity: 0; transform: translateY(6px) scale(0.99); }
+  to { opacity: 1; transform: none; }
 }
 
-@media (min-width: 1024px) {
-  .roster-metric,
-  .roster-metric:nth-child(2n),
-  .roster-metric:nth-child(n+3) {
-    border-right-width: 1px;
-    border-bottom-width: 0;
-  }
-
-  .roster-metric:last-child {
-    border-right-width: 0;
-  }
-}
-
-@layer utilities {
-  .dark .text-slate-900,
-  .dark .text-slate-800 { color: rgb(241 245 249); }
-  .dark .text-slate-700,
-  .dark .text-slate-600 { color: rgb(203 213 225); }
-  .dark .text-slate-500 { color: rgb(148 163 184); }
-  .dark .text-slate-400 { color: rgb(148 163 184); }
-  .dark .border-slate-200,
-  .dark .border-slate-300 { border-color: rgb(51 65 85); }
-  .dark .bg-white { background-color: rgb(15 23 42); }
-  .dark .bg-slate-50,
-  .dark .bg-slate-100 { background-color: rgb(30 41 59); }
-  .dark .bg-slate-200 { background-color: rgb(51 65 85); }
-  .dark .bg-blue-50 { background-color: rgb(23 37 84 / 0.65); }
-  .dark .bg-blue-100 { background-color: rgb(30 58 138 / 0.6); }
-  .dark .text-blue-700,
-  .dark .text-blue-800,
-  .dark .text-blue-900 { color: rgb(147 197 253); }
-  .dark .bg-emerald-50 { background-color: rgb(2 44 34 / 0.7); }
-  .dark .bg-emerald-100 { background-color: rgb(6 78 59 / 0.65); }
-  .dark .text-emerald-700,
-  .dark .text-emerald-800,
-  .dark .text-emerald-900 { color: rgb(110 231 183); }
-  .dark .bg-amber-50 { background-color: rgb(69 26 3 / 0.7); }
-  .dark .bg-amber-100 { background-color: rgb(120 53 15 / 0.65); }
-  .dark .text-amber-700,
-  .dark .text-amber-800,
-  .dark .text-amber-900,
-  .dark .text-amber-950 { color: rgb(253 230 138); }
-  .dark .bg-red-50 { background-color: rgb(69 10 10 / 0.7); }
-  .dark .bg-red-100 { background-color: rgb(127 29 29 / 0.6); }
-  .dark .text-red-700,
-  .dark .text-red-800,
-  .dark .text-red-900 { color: rgb(252 165 165); }
-  .dark .divide-y > :not([hidden]) ~ :not([hidden]) { border-color: rgb(51 65 85); }
-}
-
-@keyframes modal-in {
-  from { opacity: 0; transform: translateY(12px) scale(0.985); }
-  to { opacity: 1; transform: translateY(0) scale(1); }
-}
-
-@keyframes scanner-line {
-  0%, 100% { transform: translateY(0); opacity: 0.65; }
+@keyframes scanner-sweep {
+  0%, 100% { transform: translateY(0); opacity: 0.5; }
   50% { transform: translateY(176px); opacity: 1; }
 }
 
-.scanner-line {
-  animation: scanner-line 2.1s ease-in-out infinite;
-}
-
-.modal-surface {
-  animation: modal-in 160ms ease-out;
-}
+.animate-overlay { animation: overlay-in 140ms ease-out; }
+.scanner-line { animation: scanner-sweep 2.1s ease-in-out infinite; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

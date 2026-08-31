@@ -1,10 +1,12 @@
-import { Eye, FileUp, History, KeyRound, Pencil, Plus, Printer, RotateCcw, SearchX, Trash2 } from 'lucide-react'
+import { Eye, FileUp, History, KeyRound, Pencil, Plus, Printer, RotateCcw, SearchX, Trash2, UserRoundX } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { ActionMenu } from '../components/ActionMenu'
 import { Alert } from '../components/Alert'
 import { useConfirm } from '../components/ConfirmDialog'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingScreen } from '../components/LoadingScreen'
 import { SearchInput } from '../components/SearchInput'
+import { StatusBadge } from '../components/StatusBadge'
 import { useAuth } from '../features/auth/AuthProvider'
 import { StudentHistoryModal, type StudentHistoryTarget } from '../features/reports/StudentHistoryModal'
 import { QrCredentialModal } from '../features/students/QrCredentialModal'
@@ -122,7 +124,6 @@ export function StudentsPage() {
     } catch (cause) { setMessage({ text: friendlyError(cause, 'Credential batch could not be issued.'), tone: 'error' }) }
     finally { setBusy(false) }
   }
-
   const viewQr = async (student: Student) => {
     setBusy(true)
     setMessage(null)
@@ -148,39 +149,173 @@ export function StudentsPage() {
   })
 
   if (loading) return <LoadingScreen />
+
+  const showingFrom = filtered.length ? (page - 1) * PAGE_SIZE + 1 : 0
+  const showingTo = Math.min(page * PAGE_SIZE, filtered.length)
+
   return (
-    <div className="space-y-5">
-      <div className="page-header">
-        <div><h1 className="page-title">Students</h1><p className="page-subtitle">Manage records, imports, and secure QR credentials.</p></div>
-        {canManage && <div className="flex flex-wrap gap-2">{canViewQr && <button className="btn-secondary" onClick={() => setShowImport(true)}><FileUp size={17} /> Import</button>}<button className="btn-primary" onClick={() => { setMessage(null); setEditing(null) }}><Plus size={17} /> Add student</button></div>}
-      </div>
+    <div className="page">
+      <header className="page-header">
+        <div>
+          <h1 className="page-title">Students</h1>
+          <p className="page-subtitle">Records, imports, and secure QR credentials.</p>
+        </div>
+        {canManage && (
+          <div className="flex flex-wrap gap-2">
+            {canViewQr && <button className="btn-secondary" onClick={() => setShowImport(true)}><FileUp size={15} /> Import</button>}
+            <button className="btn-primary" onClick={() => { setMessage(null); setEditing(null) }}><Plus size={15} /> Add student</button>
+          </div>
+        )}
+      </header>
+
       {message && <Alert message={message.text} tone={message.tone} />}
-      <div className="toolbar">
-        <SearchInput value={search} onChange={(value) => { setSearch(value); setPage(1) }} placeholder="Search Student ID or name" />
-        <select aria-label="Filter students by department" className="field max-w-56" value={departmentFilter} onChange={(event) => { setDepartmentFilter(event.target.value); setPage(1) }}><option value="all">All departments</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.code}</option>)}</select>
-        <select aria-label="Filter students by year level" className="field max-w-44" value={yearFilter} onChange={(event) => { setYearFilter(event.target.value); setPage(1) }}><option value="all">All year levels</option>{[1, 2, 3, 4].map((year) => <option key={year} value={year}>Year {year}</option>)}</select>
-        {canManage && <select className="field max-w-44" aria-label="Filter students by status" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }}><option value="current">Current records</option><option value="active">Active</option><option value="inactive">Inactive</option><option value="deleted">Deleted</option><option value="all">All records</option></select>}
+
+      <div className="filter-bar">
+        <SearchInput value={search} onChange={(value) => { setSearch(value); setPage(1) }} placeholder="Search ID or name" />
+        <select aria-label="Filter students by department" className="field w-auto min-w-36" value={departmentFilter} onChange={(event) => { setDepartmentFilter(event.target.value); setPage(1) }}>
+          <option value="all">All departments</option>
+          {departments.map((item) => <option key={item.id} value={item.id}>{item.code}</option>)}
+        </select>
+        <select aria-label="Filter students by year level" className="field w-auto min-w-32" value={yearFilter} onChange={(event) => { setYearFilter(event.target.value); setPage(1) }}>
+          <option value="all">All years</option>
+          {[1, 2, 3, 4].map((year) => <option key={year} value={year}>Year {year}</option>)}
+        </select>
+        {canManage && (
+          <select className="field w-auto min-w-36" aria-label="Filter students by status" value={statusFilter} onChange={(event) => { setStatusFilter(event.target.value); setPage(1) }}>
+            <option value="current">Current</option>
+            <option value="active">Active</option>
+            <option value="inactive">Inactive</option>
+            <option value="deleted">Deleted</option>
+            <option value="all">All records</option>
+          </select>
+        )}
       </div>
-      {canManage && selected.size > 0 && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3"><strong className="text-sm text-blue-900">{selected.size} selected</strong><button className="btn-primary" disabled={busy} onClick={() => void issueBatch()}><Printer size={16} /> Issue and print QR batch</button><button className="btn-secondary" onClick={() => setSelected(new Set())}>Clear selection</button></div>}
-      <div className="table-wrap">
-        <table>
-          <thead><tr>{canManage && <th><input type="checkbox" checked={allPageSelected} onChange={togglePage} aria-label="Select current page" /></th>}<th>Student ID</th><th>Full Name</th><th>Year</th><th>Sex</th><th>Department</th><th>Status</th>{canManage && <th>QR Credential</th>}<th>Actions</th></tr></thead>
-          <tbody>
-            {pageRows.map((student) => {
-              const qr = qrStatuses.get(student.id)
-              return <tr key={student.id} className={student.deleted_at ? 'bg-red-50/50 text-slate-500' : ''}>
-                {canManage && <td><input type="checkbox" disabled={!!student.deleted_at} checked={selected.has(student.id)} onChange={() => setSelected((current) => { const next = new Set(current); if (next.has(student.id)) next.delete(student.id); else next.add(student.id); return next })} aria-label={`Select ${student.full_name}`} /></td>}
-                <td className="font-mono">{student.student_number}</td><td className="font-medium">{student.full_name}</td><td>{student.year_level}</td><td>{student.sex}</td><td>{student.departments?.code ?? '—'}</td>
-                <td>{student.deleted_at ? <span className="rounded-full bg-red-100 px-2 py-1 text-xs text-red-800">Deleted</span> : <span className={`rounded-full px-2 py-1 text-xs ${student.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}`}>{student.is_active ? 'Active' : 'Inactive'}</span>}</td>
-                {canManage && <td>{student.deleted_at ? '—' : qr?.has_active_credential ? <div><span className="text-sm text-emerald-700">Issued</span>{qr.issued_at && <div className="text-xs text-slate-500">{formatManilaDate(qr.issued_at)}</div>}</div> : <span className="text-sm text-slate-500">Not issued</span>}</td>}
-                <td><div className="flex flex-wrap gap-2"><button className="btn-secondary" onClick={() => setHistoryStudent(student)}><History size={14} /> History</button>{canManage && (student.deleted_at ? <button className="btn-secondary" onClick={() => void restore(student)}><RotateCcw size={14} /> Restore</button> : <><button className="btn-secondary" onClick={() => setEditing(student)}><Pencil size={14} /> Edit</button><button className="btn-secondary" onClick={() => void toggleActive(student)}>{student.is_active ? 'Deactivate' : 'Activate'}</button>{canViewQr && qr?.has_active_credential && <button className="btn-primary" disabled={busy} onClick={() => void viewQr(student)}><Eye size={14} /> View QR</button>}<button className="btn-secondary" disabled={busy} onClick={() => void issueOne(student)}>{qr?.has_active_credential ? <RotateCcw size={14} /> : <KeyRound size={14} />}{qr?.has_active_credential ? 'Regenerate QR' : 'Issue QR'}</button><button className="btn-danger" onClick={() => void remove(student)} aria-label={`Delete ${student.full_name}`}><Trash2 size={14} /></button></>)}</div></td>
+
+      {canManage && selected.size > 0 && (
+        <div className="flex flex-wrap items-center gap-3 rounded-xl border border-accent/30 bg-accent-soft px-3.5 py-2.5">
+          <span className="text-base font-medium text-accent-ink">{selected.size} selected</span>
+          <button className="btn-primary btn-sm" disabled={busy} onClick={() => void issueBatch()}><Printer size={14} /> Issue and print QR batch</button>
+          <button className="btn-ghost btn-sm" onClick={() => setSelected(new Set())}>Clear</button>
+        </div>
+      )}
+
+      <div className="table-shell">
+        <div className="table-scroll">
+          <table>
+            <thead>
+              <tr>
+                {canManage && <th className="w-10"><input type="checkbox" checked={allPageSelected} onChange={togglePage} aria-label="Select current page" /></th>}
+                <th>Student</th>
+                <th>Department</th>
+                {canManage && <th>QR credential</th>}
+                <th>Status</th>
+                <th className="w-12" aria-label="Actions" />
               </tr>
-            })}
-            {!pageRows.length && <tr><td colSpan={canManage ? 9 : 7}><EmptyState compact icon={SearchX} title="No students found" description="Try changing the search or filters." /></td></tr>}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {pageRows.map((student) => {
+                const qr = qrStatuses.get(student.id)
+                const deleted = !!student.deleted_at
+                return (
+                  <tr key={student.id} className={deleted ? 'opacity-60' : ''}>
+                    {canManage && (
+                      <td>
+                        <input
+                          type="checkbox"
+                          disabled={deleted}
+                          checked={selected.has(student.id)}
+                          onChange={() => setSelected((current) => {
+                            const next = new Set(current)
+                            if (next.has(student.id)) next.delete(student.id)
+                            else next.add(student.id)
+                            return next
+                          })}
+                          aria-label={`Select ${student.full_name}`}
+                        />
+                      </td>
+                    )}
+                    <td>
+                      <div className="cell-title">{student.full_name}</div>
+                      <div className="cell-meta">
+                        <span className="font-mono">{student.student_number}</span>
+                        <span className="px-1.5 text-line-strong">·</span>
+                        Year {student.year_level}
+                        <span className="px-1.5 text-line-strong">·</span>
+                        {student.sex}
+                      </div>
+                    </td>
+                    <td>
+                      <div className="text-ink">{student.departments?.code ?? '—'}</div>
+                    </td>
+                    {canManage && (
+                      <td>
+                        {deleted ? <span className="text-muted">—</span>
+                          : qr?.has_active_credential ? (
+                            <>
+                              <div className="text-ink">Issued</div>
+                              {qr.issued_at && <div className="cell-meta">{formatManilaDate(qr.issued_at)}</div>}
+                            </>
+                          ) : <span className="text-muted">Not issued</span>}
+                      </td>
+                    )}
+                    <td>
+                      {deleted
+                        ? <StatusBadge tone="bad">Deleted</StatusBadge>
+                        : <StatusBadge tone={student.is_active ? 'ok' : 'neutral'}>{student.is_active ? 'Active' : 'Inactive'}</StatusBadge>}
+                    </td>
+                    <td>
+                      <div className="flex justify-end">
+                        <ActionMenu
+                          label={`Actions for ${student.full_name}`}
+                          items={[
+                            { icon: History, label: 'Attendance history', onSelect: () => setHistoryStudent(student) },
+                            canManage && deleted && 'separator',
+                            canManage && deleted && { icon: RotateCcw, label: 'Restore student', onSelect: () => void restore(student) },
+                            canManage && !deleted && { icon: Pencil, label: 'Edit details', onSelect: () => setEditing(student) },
+                            canManage && !deleted && {
+                              icon: UserRoundX,
+                              label: student.is_active ? 'Deactivate' : 'Activate',
+                              onSelect: () => void toggleActive(student),
+                            },
+                            canManage && !deleted && 'separator',
+                            canViewQr && !deleted && qr?.has_active_credential && {
+                              icon: Eye, label: 'View QR code', disabled: busy, onSelect: () => void viewQr(student),
+                            },
+                            canManage && !deleted && {
+                              icon: qr?.has_active_credential ? RotateCcw : KeyRound,
+                              label: qr?.has_active_credential ? 'Regenerate QR' : 'Issue QR',
+                              disabled: busy,
+                              onSelect: () => void issueOne(student),
+                            },
+                            canManage && !deleted && 'separator',
+                            canManage && !deleted && { icon: Trash2, label: 'Delete student', danger: true, onSelect: () => void remove(student) },
+                          ]}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+              {!pageRows.length && (
+                <tr>
+                  <td colSpan={canManage ? 6 : 4}>
+                    <EmptyState compact icon={SearchX} title="No students found" description="Try changing the search or filters." />
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        <div className="table-foot">
+          <span>{showingFrom}–{showingTo} of {filtered.length.toLocaleString()}</span>
+          <div className="flex items-center gap-2">
+            <button className="btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</button>
+            <span className="tabular-nums">Page {page} of {pageCount}</span>
+            <button className="btn-secondary btn-sm" disabled={page >= pageCount} onClick={() => setPage((value) => value + 1)}>Next</button>
+          </div>
+        </div>
       </div>
-      <div className="flex flex-wrap items-center justify-between gap-3 text-sm text-slate-600"><span>Showing {filtered.length ? (page - 1) * PAGE_SIZE + 1 : 0}–{Math.min(page * PAGE_SIZE, filtered.length)} of {filtered.length}</span><div className="flex items-center gap-2"><button className="btn-secondary" disabled={page <= 1} onClick={() => setPage((value) => value - 1)}>Previous</button><span>Page {page} of {pageCount}</span><button className="btn-secondary" disabled={page >= pageCount} onClick={() => setPage((value) => value + 1)}>Next</button></div></div>
+
       {editing !== undefined && <StudentFormModal student={editing} departments={departments} error={message?.tone === 'error' ? message.text : null} onClose={() => setEditing(undefined)} onSave={save} />}
       {showImport && <StudentImportModal departments={departments} onClose={() => setShowImport(false)} onImported={load} />}
       {qrModal && <QrCredentialModal students={students} credentials={qrModal.credentials} mode={qrModal.mode} onClose={() => setQrModal(null)} />}

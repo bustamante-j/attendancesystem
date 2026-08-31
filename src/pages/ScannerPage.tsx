@@ -1,8 +1,10 @@
-import { ArrowLeft, Camera, CameraOff, CheckCircle2, Clock3, ScanLine, TriangleAlert, XCircle } from 'lucide-react'
+import { ArrowLeft, Camera, CameraOff, CheckCircle2, ScanLine, TriangleAlert, XCircle } from 'lucide-react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
 import { Alert } from '../components/Alert'
 import { LoadingScreen } from '../components/LoadingScreen'
+import { SegmentedControl } from '../components/SegmentedControl'
+import { StatusBadge, type StatusTone } from '../components/StatusBadge'
 import { ManualAttendancePanel } from '../features/attendance/ManualAttendancePanel'
 import { ScannerCamera } from '../features/attendance/ScannerCamera'
 import { playScanFeedback, primeScanFeedback, type ScanFeedbackTone } from '../features/attendance/feedback'
@@ -18,17 +20,12 @@ import {
   type AttendanceDirection,
 } from '../services/attendance'
 import { getEvent } from '../services/events'
-import type { AttendanceResult, AttendanceSummary, EventRecord } from '../types/app'
+import type { AttendanceResult, AttendanceSummary, EventRecord, EventStatus } from '../types/app'
 import { formatManilaDate } from '../utils/dates'
 
-const EMPTY_SUMMARY: AttendanceSummary = {
-  expected: 0,
-  checkedIn: 0,
-  remaining: 0,
-  present: 0,
-  late: 0,
-  checkedOut: 0,
-}
+const EMPTY_SUMMARY: AttendanceSummary = { expected: 0, checkedIn: 0, remaining: 0, present: 0, late: 0, checkedOut: 0 }
+
+const statusTone: Record<EventStatus, StatusTone> = { open: 'ok', draft: 'warn', closed: 'neutral' }
 
 interface RecentScan {
   id: string
@@ -48,16 +45,24 @@ function resultTone(code: string): ScanFeedbackTone {
   return 'error'
 }
 
+/** Border + fill, for the floating scan confirmation. */
 function resultStyles(tone: ScanFeedbackTone) {
-  if (tone === 'success') return 'border-emerald-300 bg-emerald-50 text-emerald-900 dark:border-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-100'
-  if (tone === 'warning') return 'border-amber-300 bg-amber-50 text-amber-950 dark:border-amber-700 dark:bg-amber-950/70 dark:text-amber-100'
-  return 'border-red-300 bg-red-50 text-red-900 dark:border-red-700 dark:bg-red-950/70 dark:text-red-100'
+  if (tone === 'success') return 'border-ok/30 bg-ok-soft text-ok-ink'
+  if (tone === 'warning') return 'border-warn/30 bg-warn-soft text-warn-ink'
+  return 'border-bad/30 bg-bad-soft text-bad-ink'
 }
 
-function ResultIcon({ tone, size = 28 }: { tone: ScanFeedbackTone; size?: number }) {
-  if (tone === 'success') return <CheckCircle2 className="shrink-0 text-emerald-700" size={size} />
-  if (tone === 'warning') return <TriangleAlert className="shrink-0 text-amber-700" size={size} />
-  return <XCircle className="shrink-0 text-red-700" size={size} />
+/** Fill only, for the result banner already framed by its surface. */
+function resultFill(tone: ScanFeedbackTone) {
+  if (tone === 'success') return 'bg-ok-soft text-ok-ink'
+  if (tone === 'warning') return 'bg-warn-soft text-warn-ink'
+  return 'bg-bad-soft text-bad-ink'
+}
+
+function ResultIcon({ tone, size = 20 }: { tone: ScanFeedbackTone; size?: number }) {
+  if (tone === 'success') return <CheckCircle2 className="shrink-0" size={size} />
+  if (tone === 'warning') return <TriangleAlert className="shrink-0" size={size} />
+  return <XCircle className="shrink-0" size={size} />
 }
 
 export function ScannerPage() {
@@ -222,15 +227,15 @@ export function ScannerPage() {
 
   if (!eventRecord) {
     return (
-      <div className="mx-auto max-w-2xl space-y-4">
-        <Link className="btn-secondary" to="/events"><ArrowLeft size={16} /> Events</Link>
+      <div className="mx-auto max-w-xl space-y-4">
+        <Link className="btn-secondary" to="/events"><ArrowLeft size={15} /> Events</Link>
         <Alert message={error ?? 'The event could not be loaded.'} />
       </div>
     )
   }
 
   const currentTone = result ? resultTone(result.code) : null
-  const summaryCards = [
+  const stats: Array<[string, number]> = [
     ['Expected', summary.expected],
     ['Checked in', summary.checkedIn],
     ['Remaining', summary.remaining],
@@ -240,14 +245,18 @@ export function ScannerPage() {
   ]
 
   return (
-    <div className="mx-auto max-w-6xl space-y-5">
+    <div className="page mx-auto max-w-5xl">
       <header className="page-header">
-        <div>
-          <Link className="mb-3 inline-flex items-center gap-1 text-sm text-slate-600 hover:text-slate-900" to="/events"><ArrowLeft size={16} /> Back to events</Link>
-          <h1 className="page-title">{eventRecord.name}</h1>
+        <div className="min-w-0">
+          <Link className="mb-2 inline-flex items-center gap-1.5 text-meta text-muted transition-colors hover:text-ink" to="/events">
+            <ArrowLeft size={14} /> Back to events
+          </Link>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="page-title">{eventRecord.name}</h1>
+            <StatusBadge tone={statusTone[eventRecord.status]} variant="soft">{eventRecord.status}</StatusBadge>
+          </div>
           <p className="page-subtitle">{eventRecord.venue || 'No venue'} · {formatManilaDate(eventRecord.start_at)}</p>
         </div>
-        <span className={`rounded-full px-3 py-1 text-sm font-medium capitalize ${eventRecord.status === 'open' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}`}>{eventRecord.status}</span>
       </header>
 
       <EventWorkspaceNav eventRecord={eventRecord} active="scanner" canViewReports={profile?.role !== 'officer'} />
@@ -255,14 +264,14 @@ export function ScannerPage() {
       {error && <Alert message={error} />}
 
       {eventRecord.status !== 'open' ? (
-        <Alert message="This event is not open. Open it from the Events page before recording attendance." tone="info" />
+        <Alert tone="info" message="This event is not open. Open it from the Events page before recording attendance." />
       ) : !hasAccess ? (
-        <section className="panel mx-auto max-w-lg text-center">
-          <ScanLine className="mx-auto text-blue-700" size={38} />
+        <section className="surface mx-auto max-w-sm px-6 py-8 text-center">
+          <ScanLine className="mx-auto text-accent" size={26} strokeWidth={1.75} />
           <h2 className="mt-3 text-lg font-semibold">Enter event PIN</h2>
-          <p className="mt-1 text-sm text-slate-500">Assigned staff must verify the current 6-digit PIN before the scanner opens.</p>
+          <p className="mt-1 text-base text-muted">Assigned staff must verify the current 6-digit PIN before the scanner opens.</p>
           <input
-            className="field mx-auto mt-5 max-w-56 text-center font-mono text-2xl tracking-[0.3em]"
+            className="field kbd-pin mx-auto mt-5 max-w-52"
             inputMode="numeric"
             maxLength={6}
             autoComplete="one-time-code"
@@ -272,7 +281,7 @@ export function ScannerPage() {
             placeholder="000000"
             aria-label="6-digit event PIN"
           />
-          <button className="btn-primary mt-4 w-full max-w-56" disabled={pin.length !== 6 || pinBusy} onClick={() => void grantAccess()}>
+          <button className="btn-primary mt-4 w-full max-w-52" disabled={pin.length !== 6 || pinBusy} onClick={() => void grantAccess()}>
             {pinBusy ? 'Verifying…' : 'Continue to scanner'}
           </button>
         </section>
@@ -280,94 +289,103 @@ export function ScannerPage() {
         <>
           {scanPopup?.result.student && (
             <div className="pointer-events-none fixed inset-x-3 top-20 z-[70] flex justify-center" aria-live="assertive" aria-atomic="true">
-              <div className={`w-full max-w-2xl rounded-2xl border p-5 shadow-2xl backdrop-blur sm:p-6 ${resultStyles(resultTone(scanPopup.result.code))}`} role="status">
-                <div className="flex items-center gap-4 sm:gap-5">
-                  <ResultIcon tone={resultTone(scanPopup.result.code)} size={42} />
+              <div
+                className={`animate-overlay w-full max-w-xl rounded-2xl border px-5 py-4 shadow-overlay backdrop-blur ${resultStyles(resultTone(scanPopup.result.code))}`}
+                role="status"
+              >
+                <div className="flex items-center gap-4">
+                  <ResultIcon tone={resultTone(scanPopup.result.code)} size={30} />
                   <div className="min-w-0">
-                    <div className="text-xs font-bold uppercase tracking-wider opacity-70 sm:text-sm">{scanPopup.method === 'qr' ? 'QR scan recorded' : 'Manual attendance recorded'}</div>
-                    <div className="break-words text-3xl font-black leading-tight tracking-tight sm:text-4xl">{scanPopup.result.student.fullName}</div>
-                    <div className="mt-1 font-mono text-base font-bold sm:text-lg">Student ID: {scanPopup.result.student.studentNumber}</div>
+                    <div className="text-meta font-medium uppercase tracking-wide opacity-75">
+                      {scanPopup.method === 'qr' ? 'QR scan recorded' : 'Manual attendance recorded'}
+                    </div>
+                    <div className="break-words text-3xl font-semibold leading-tight tracking-tight">{scanPopup.result.student.fullName}</div>
+                    <div className="mt-0.5 font-mono text-base">{scanPopup.result.student.studentNumber}</div>
                   </div>
                 </div>
               </div>
             </div>
           )}
 
-          <section className="panel p-2 sm:p-5" aria-labelledby="qr-scanner-title">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1 sm:px-0">
-              <div><h2 className="font-semibold" id="qr-scanner-title">QR scanner</h2><p className="mt-1 text-xs text-slate-500">Place the student QR inside the frame.</p></div>
-              <span className="status-chip bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">{direction === 'check_in' ? 'Checking in' : 'Checking out'}</span>
+          <section className="table-shell" aria-labelledby="qr-scanner-title">
+            <div className="surface-head">
+              <div>
+                <h2 className="section-title" id="qr-scanner-title">QR scanner</h2>
+                <p className="section-note">Place the student QR inside the frame. Repeat scans wait 3 seconds.</p>
+              </div>
+              {eventRecord.attendance_mode === 'check_in_out' ? (
+                <SegmentedControl
+                  value={direction}
+                  onChange={setDirection}
+                  label="Attendance direction"
+                  options={[
+                    { value: 'check_in', label: 'Check in' },
+                    { value: 'check_out', label: 'Check out' },
+                  ]}
+                />
+              ) : (
+                <span className="badge badge-accent">Checking in</span>
+              )}
             </div>
-            <ScannerCamera enabled={cameraActive} processing={processing} onDecode={processCredential} onError={handleCameraError} />
-            {cameraError && <div className="mt-3"><Alert message={cameraError} /></div>}
-            <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-              <p className="text-xs text-slate-500">Use HTTPS and allow camera permission. Scans have a 3-second repeat cooldown.</p>
-              {cameraActive
-                ? <button className="btn-secondary w-full sm:w-auto" onClick={() => setCameraActive(false)}><CameraOff size={17} /> Stop camera</button>
-                : <button className="btn-primary w-full sm:w-auto" onClick={() => void startCamera()}><Camera size={17} /> Start camera</button>}
+
+            <div className="p-3 sm:p-5">
+              <ScannerCamera enabled={cameraActive} processing={processing} onDecode={processCredential} onError={handleCameraError} />
+              {cameraError && <div className="mt-3"><Alert message={cameraError} /></div>}
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-meta text-muted">Requires HTTPS and camera permission.</p>
+                {cameraActive
+                  ? <button className="btn-secondary w-full sm:w-auto" onClick={() => setCameraActive(false)}><CameraOff size={16} /> Stop camera</button>
+                  : <button className="btn-primary w-full sm:w-auto" onClick={() => void startCamera()}><Camera size={16} /> Start camera</button>}
+              </div>
             </div>
           </section>
 
-          <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6" aria-label="Live attendance counts">
-            {summaryCards.map(([label, count]) => (
-              <div className="panel p-3.5 sm:p-4" key={label}>
-                <div className="text-xs font-medium text-slate-500">{label}</div>
-                <div className="mt-1 text-2xl font-bold tabular-nums tracking-tight">{count.toLocaleString()}</div>
+          <section className="stat-strip grid-cols-3 lg:grid-cols-6" aria-label="Live attendance counts">
+            {stats.map(([label, count]) => (
+              <div className="stat" key={label}>
+                <div className="stat-label">{label}</div>
+                <div className="stat-value text-2xl">{count.toLocaleString()}</div>
               </div>
             ))}
           </section>
 
-          <section className="panel sticky top-20 z-[5] p-3 shadow-md sm:p-4 md:static md:shadow-sm">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h2 className="font-semibold">Attendance direction</h2>
-                <p className="text-xs text-slate-500">The database validates the selected event window.</p>
-              </div>
-              <div className="inline-flex w-full rounded-xl border border-slate-300 bg-slate-100 p-1 sm:w-auto dark:border-slate-700 dark:bg-slate-800">
-                <button aria-pressed={direction === 'check_in'} className={`min-h-10 flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${direction === 'check_in' ? 'bg-white text-blue-800 shadow-sm dark:bg-slate-950 dark:text-blue-300' : 'text-slate-600 dark:text-slate-400'}`} onClick={() => setDirection('check_in')}>Check in</button>
-                {eventRecord.attendance_mode === 'check_in_out' && <button aria-pressed={direction === 'check_out'} className={`min-h-10 flex-1 rounded-lg px-4 py-2 text-sm font-semibold transition sm:flex-none ${direction === 'check_out' ? 'bg-white text-blue-800 shadow-sm dark:bg-slate-950 dark:text-blue-300' : 'text-slate-600 dark:text-slate-400'}`} onClick={() => setDirection('check_out')}>Check out</button>}
-              </div>
+          <section className="table-shell" aria-live="polite" aria-atomic="true">
+            <div className="surface-head">
+              <h2 className="section-title">Scan activity</h2>
+              <span className="text-meta text-muted">{recentScans.length ? `${recentScans.length} this session` : 'Nothing yet'}</span>
             </div>
-          </section>
 
-          <div className="grid gap-5 lg:grid-cols-2">
-            <section className="panel min-h-40" aria-live="polite" aria-atomic="true">
-              <div className="flex items-center gap-2"><ScanLine size={18} /><h2 className="font-semibold">Latest result</h2></div>
-              {!result || !currentTone ? (
-                <div className="flex min-h-28 flex-col items-center justify-center text-center text-slate-500">
-                  <ScanLine size={30} />
-                  <p className="mt-2 text-sm">The latest scan result will appear here.</p>
-                </div>
-              ) : (
-                <div className={`mt-3 rounded-lg border p-4 ${resultStyles(currentTone)}`}>
-                  <div className="flex items-start gap-3">
-                    <ResultIcon tone={currentTone} />
-                    <div className="min-w-0">
-                      <div className="font-semibold">{result.student?.fullName ?? 'Scan result'}</div>
-                      {result.student && <div className="text-sm opacity-80">{result.student.studentNumber}</div>}
-                      <p className="mt-2 text-sm">{result.message}</p>
-                    </div>
+            {result && currentTone && (
+              <div className={`border-b border-line px-5 py-4 ${resultFill(currentTone)}`}>
+                <div className="flex items-start gap-3">
+                  <ResultIcon tone={currentTone} />
+                  <div className="min-w-0">
+                    <div className="font-medium">{result.student?.fullName ?? 'Scan result'}</div>
+                    {result.student && <div className="text-meta font-mono opacity-80">{result.student.studentNumber}</div>}
+                    <p className="mt-1 text-base">{result.message}</p>
                   </div>
                 </div>
-              )}
-            </section>
-
-            <section className="panel">
-              <div className="flex items-center gap-2"><Clock3 size={18} /><h2 className="font-semibold">Recent activity</h2></div>
-              <div className="mt-3 divide-y">
-                {recentScans.map((scan) => (
-                  <div className="py-3 first:pt-0 last:pb-0" key={scan.id}>
-                    <div className="flex items-center justify-between gap-3">
-                      <span className="truncate text-sm font-medium">{scan.result.student?.fullName ?? scan.result.message}</span>
-                      <span className="shrink-0 text-xs text-slate-500">{scan.recordedAt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
-                    </div>
-                    <div className="mt-1 text-xs text-slate-500">{scan.method === 'qr' ? 'QR' : 'Manual'} · {scan.result.code.replaceAll('_', ' ')}</div>
-                  </div>
-                ))}
-                {!recentScans.length && <p className="py-5 text-center text-sm text-slate-500">No scans in this session.</p>}
               </div>
-            </section>
-          </div>
+            )}
+
+            {recentScans.length ? (
+              <ul className="divide-y divide-line">
+                {recentScans.map((scan) => (
+                  <li className="flex items-center justify-between gap-3 px-5 py-2.5" key={scan.id}>
+                    <div className="min-w-0">
+                      <div className="truncate text-base text-ink">{scan.result.student?.fullName ?? scan.result.message}</div>
+                      <div className="cell-meta capitalize">{scan.method} · {scan.result.code.replaceAll('_', ' ')}</div>
+                    </div>
+                    <span className="shrink-0 text-meta tabular-nums text-muted">
+                      {scan.recordedAt.toLocaleTimeString('en-PH', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            ) : !result && (
+              <p className="px-5 py-8 text-center text-base text-muted">Scan results will appear here.</p>
+            )}
+          </section>
 
           <ManualAttendancePanel eventId={eventId} direction={direction} onResult={handleAttendanceResult} />
         </>

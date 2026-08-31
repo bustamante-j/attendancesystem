@@ -38,30 +38,111 @@ export function StudentImportModal({ departments, onClose, onImported }: { depar
   return (
     <Modal title="Import students" onClose={onClose} size="xl" closeDisabled={busy}>
       <div className="space-y-5">
-        <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-          Upload a `.csv` or `.xlsx` file up to 5 MB and 2,000 rows. Required columns are <code>student_number</code>, <code>full_name</code>, <code>year_level</code>, <code>sex</code>, and <code>department_code</code>. <code>is_active</code> is optional.
-        </div>
+        <p className="rounded-lg border border-line bg-sunken px-3.5 py-2.5 text-meta text-muted">
+          Upload a <code>.csv</code> or <code>.xlsx</code> file up to 5 MB and 2,000 rows. Required columns:{' '}
+          <code>student_number</code>, <code>full_name</code>, <code>year_level</code>, <code>sex</code>,{' '}
+          <code>department_code</code>. <code>is_active</code> is optional.
+        </p>
+
         {error && <Alert message={error} />}
         {result && <Alert tone="success" message={`Import completed: ${result.inserted} created, ${result.updated} updated, ${result.errors.length} rejected by the database.`} />}
-        <div className="flex flex-wrap gap-3">
+
+        <div className="flex flex-wrap gap-2">
           <label className="btn-primary cursor-pointer">
-            <FileSpreadsheet size={17} /> {busy ? 'Reading…' : 'Choose CSV or Excel'}
-            <input className="sr-only" type="file" accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" disabled={busy} onChange={(event) => void chooseFile(event.target.files?.[0])} />
+            <FileSpreadsheet size={15} /> {busy ? 'Reading…' : 'Choose CSV or Excel'}
+            <input
+              className="sr-only"
+              type="file"
+              accept=".csv,.xlsx,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+              disabled={busy}
+              onChange={(event) => void chooseFile(event.target.files?.[0])}
+            />
           </label>
-          <button className="btn-secondary" onClick={downloadStudentImportTemplate}><Download size={17} /> Download CSV template</button>
+          <button className="btn-secondary" onClick={downloadStudentImportTemplate}><Download size={15} /> CSV template</button>
         </div>
-        {parsed && <>
-          <div className="grid gap-3 sm:grid-cols-4">
-            <div className="rounded-lg bg-slate-100 p-4"><div className="text-xs text-slate-500">File</div><div className="mt-1 truncate font-medium">{parsed.fileName}</div></div>
-            <div className="rounded-lg bg-slate-100 p-4"><div className="text-xs text-slate-500">Data rows</div><div className="mt-1 text-xl font-bold">{parsed.totalRows}</div></div>
-            <div className="rounded-lg bg-emerald-50 p-4"><div className="text-xs text-emerald-700">Valid rows</div><div className="mt-1 text-xl font-bold text-emerald-800">{parsed.rows.length}</div></div>
-            <div className="rounded-lg bg-red-50 p-4"><div className="text-xs text-red-700">Validation errors</div><div className="mt-1 text-xl font-bold text-red-800">{validationErrors.length}</div></div>
+
+        {parsed && (
+          <>
+            <div className="stat-strip grid-cols-2 sm:grid-cols-4">
+              <div className="stat">
+                <div className="stat-label">File</div>
+                <div className="mt-1 truncate text-base text-ink" title={parsed.fileName}>{parsed.fileName}</div>
+              </div>
+              <div className="stat">
+                <div className="stat-label">Data rows</div>
+                <div className="stat-value text-2xl">{parsed.totalRows}</div>
+              </div>
+              <div className="stat">
+                <div className="stat-label">Valid rows</div>
+                <div className="stat-value text-2xl">{parsed.rows.length}</div>
+              </div>
+              <div className="stat">
+                <div className="stat-label">Validation errors</div>
+                <div className={`stat-value text-2xl ${validationErrors.length ? 'text-bad-ink' : ''}`}>{validationErrors.length}</div>
+              </div>
+            </div>
+
+            {(validationErrors.length > 0 || warnings.length > 0) && (
+              <div className="table-shell">
+                <div className="max-h-64 overflow-auto">
+                  <table>
+                    <thead><tr><th>Row</th><th>Student ID</th><th>Severity</th><th>Issue</th></tr></thead>
+                    <tbody>
+                      {parsed.issues.slice(0, 300).map((issue, index) => (
+                        <tr key={`${issue.row}-${index}`}>
+                          <td className="tabular-nums">{issue.row}</td>
+                          <td className="font-mono text-meta">{issue.studentNumber || '—'}</td>
+                          <td className={`capitalize ${issue.severity === 'error' ? 'text-bad-ink' : 'text-warn-ink'}`}>{issue.severity}</td>
+                          <td className="text-muted">{issue.message}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {parsed.issues.length > 300 && <p className="table-foot">Only the first 300 issues are shown.</p>}
+              </div>
+            )}
+
+            <label className="flex items-start gap-3 rounded-lg border border-line p-3.5">
+              <input className="mt-0.5" type="checkbox" checked={updateExisting} onChange={(event) => setUpdateExisting(event.target.checked)} />
+              <span>
+                <span className="block font-medium text-ink">Update matching Student IDs</span>
+                <span className="mt-0.5 block text-meta text-muted">
+                  When enabled, existing non-deleted students are updated. Otherwise matching IDs are rejected and reported.
+                </span>
+              </span>
+            </label>
+
+            <div className="flex justify-end gap-2 border-t border-line pt-4">
+              <button className="btn-secondary" onClick={onClose} disabled={busy}>Close</button>
+              <button className="btn-primary" onClick={() => void runImport()} disabled={busy || !parsed.rows.length}>
+                <Upload size={15} /> {busy ? 'Importing…' : `Import ${parsed.rows.length} valid rows`}
+              </button>
+            </div>
+          </>
+        )}
+
+        {result?.errors.length ? (
+          <div>
+            <h3 className="section-title mb-2">Database rejections</h3>
+            <div className="table-shell">
+              <div className="max-h-48 overflow-auto">
+                <table>
+                  <thead><tr><th>Source row</th><th>Student ID</th><th>Reason</th></tr></thead>
+                  <tbody>
+                    {result.errors.map((issue, index) => (
+                      <tr key={`${issue.row}-${index}`}>
+                        <td className="tabular-nums">{issue.row}</td>
+                        <td className="font-mono text-meta">{issue.studentNumber || '—'}</td>
+                        <td className="text-muted">{issue.message}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
-          {(validationErrors.length > 0 || warnings.length > 0) && <div className="max-h-64 overflow-auto rounded-lg border border-slate-200"><table><thead><tr><th>Row</th><th>Student ID</th><th>Severity</th><th>Issue</th></tr></thead><tbody>{parsed.issues.slice(0, 300).map((issue, index) => <tr key={`${issue.row}-${index}`}><td>{issue.row}</td><td>{issue.studentNumber || '—'}</td><td className={issue.severity === 'error' ? 'text-red-700' : 'text-amber-700'}>{issue.severity}</td><td>{issue.message}</td></tr>)}</tbody></table>{parsed.issues.length > 300 && <p className="p-3 text-sm text-slate-500">Only the first 300 issues are shown.</p>}</div>}
-          <label className="flex items-start gap-3 rounded-lg border border-slate-200 p-4 text-sm"><input className="mt-1" type="checkbox" checked={updateExisting} onChange={(event) => setUpdateExisting(event.target.checked)} /><span><strong>Update matching Student IDs</strong><span className="mt-1 block text-slate-500">When enabled, existing non-deleted students are updated. Otherwise matching IDs are rejected and reported.</span></span></label>
-          <div className="flex justify-end gap-3 border-t border-slate-200 pt-4"><button className="btn-secondary" onClick={onClose} disabled={busy}>Close</button><button className="btn-primary" onClick={() => void runImport()} disabled={busy || !parsed.rows.length}><Upload size={17} /> {busy ? 'Importing…' : `Import ${parsed.rows.length} valid rows`}</button></div>
-        </>}
-        {result?.errors.length ? <div><h3 className="mb-2 font-semibold">Database rejections</h3><div className="max-h-48 overflow-auto rounded-lg border"><table><thead><tr><th>Source row</th><th>Student ID</th><th>Reason</th></tr></thead><tbody>{result.errors.map((issue, index) => <tr key={`${issue.row}-${index}`}><td>{issue.row}</td><td>{issue.studentNumber || '—'}</td><td>{issue.message}</td></tr>)}</tbody></table></div></div> : null}
+        ) : null}
       </div>
     </Modal>
   )

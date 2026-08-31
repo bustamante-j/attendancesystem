@@ -54,28 +54,43 @@ export function PwaProvider({ children }: { children: ReactNode }) {
   return (
     <PwaContext.Provider value={{ canInstall: !!installPrompt, install }}>
       {children}
-      <div className="pointer-events-none fixed bottom-4 right-4 z-[80] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-3" aria-live="polite">
+      <div className="pointer-events-none fixed bottom-4 right-4 z-[80] flex w-[min(22rem,calc(100vw-2rem))] flex-col gap-2.5" aria-live="polite">
         {isOffline && (
-          <div className="pointer-events-auto flex items-start gap-3 rounded-2xl border border-amber-300 bg-amber-50 p-4 text-amber-950 shadow-xl dark:border-amber-700 dark:bg-amber-950 dark:text-amber-100" role="status">
-            <WifiOff className="mt-0.5 shrink-0" size={19} />
-            <div><strong className="text-sm">Attendly is offline</strong><p className="mt-0.5 text-xs leading-5 opacity-80">Cached pages remain available. Scans and changes require an internet connection.</p></div>
+          <div className="animate-overlay pointer-events-auto flex items-start gap-2.5 rounded-xl border border-warn/30 bg-warn-soft px-3.5 py-3 text-warn-ink shadow-overlay" role="status">
+            <WifiOff className="mt-0.5 shrink-0" size={16} />
+            <div>
+              <strong className="font-medium">Attendly is offline</strong>
+              <p className="mt-0.5 text-meta opacity-90">Cached pages remain available. Scans and changes need a connection.</p>
+            </div>
           </div>
         )}
         {needsRefresh && (
-          <div className="pointer-events-auto rounded-2xl border border-blue-200 bg-white p-4 shadow-xl dark:border-blue-900 dark:bg-slate-900" role="alert">
-            <div className="flex items-start gap-3">
-              <RefreshCw className="mt-0.5 shrink-0 text-blue-600 dark:text-blue-400" size={19} />
-              <div className="min-w-0 flex-1"><strong className="text-sm">An Attendly update is ready</strong><p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">Finish any active scan, then refresh to use the latest version.</p></div>
-              <button type="button" className="icon-btn -mr-2 -mt-2" aria-label="Dismiss update" onClick={() => setNeedsRefresh(false)}><X size={17} /></button>
+          <div className="animate-overlay pointer-events-auto rounded-xl border border-line bg-surface p-3.5 shadow-overlay" role="alert">
+            <div className="flex items-start gap-2.5">
+              <RefreshCw className="mt-0.5 shrink-0 text-accent" size={16} />
+              <div className="min-w-0 flex-1">
+                <strong className="font-medium text-ink">An update is ready</strong>
+                <p className="mt-0.5 text-meta text-muted">Finish any active scan, then refresh.</p>
+              </div>
+              <button type="button" className="icon-btn -mr-1.5 -mt-1.5 h-8 w-8" aria-label="Dismiss update" onClick={() => setNeedsRefresh(false)}>
+                <X size={15} />
+              </button>
             </div>
-            <button type="button" className="btn-primary mt-3 w-full" onClick={() => void updateServiceWorker.current?.(true)}><RefreshCw size={16} /> Update Attendly</button>
+            <button type="button" className="btn-primary mt-3 w-full" onClick={() => void updateServiceWorker.current?.(true)}>
+              <RefreshCw size={15} /> Update Attendly
+            </button>
           </div>
         )}
         {offlineReady && !needsRefresh && (
-          <div className="pointer-events-auto flex items-start gap-3 rounded-2xl border border-emerald-200 bg-white p-4 shadow-xl dark:border-emerald-900 dark:bg-slate-900" role="status">
-            <Download className="mt-0.5 shrink-0 text-emerald-600 dark:text-emerald-400" size={19} />
-            <div className="min-w-0 flex-1"><strong className="text-sm">Attendly is ready for offline launch</strong><p className="mt-0.5 text-xs leading-5 text-slate-500 dark:text-slate-400">Attendance actions still require a connection.</p></div>
-            <button type="button" className="icon-btn -mr-2 -mt-2" aria-label="Dismiss notification" onClick={() => setOfflineReady(false)}><X size={17} /></button>
+          <div className="animate-overlay pointer-events-auto flex items-start gap-2.5 rounded-xl border border-line bg-surface px-3.5 py-3 shadow-overlay" role="status">
+            <Download className="mt-0.5 shrink-0 text-ok" size={16} />
+            <div className="min-w-0 flex-1">
+              <strong className="font-medium text-ink">Ready for offline launch</strong>
+              <p className="mt-0.5 text-meta text-muted">Attendance actions still require a connection.</p>
+            </div>
+            <button type="button" className="icon-btn -mr-1.5 -mt-1.5 h-8 w-8" aria-label="Dismiss notification" onClick={() => setOfflineReady(false)}>
+              <X size={15} />
+            </button>
           </div>
         )}
       </div>

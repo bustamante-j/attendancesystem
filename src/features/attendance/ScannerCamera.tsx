@@ -74,31 +74,35 @@ export function ScannerCamera({ enabled, processing, onDecode, onError }: {
   }, [enabled])
 
   return (
-    <div className="relative aspect-[3/4] max-h-[58svh] min-h-80 overflow-hidden rounded-xl bg-slate-950 ring-1 ring-white/10 sm:aspect-video sm:max-h-[68vh]">
+    // The viewport stays dark in both themes: it frames a live camera feed, and
+    // a light chrome around video only reduces contrast on the QR itself.
+    <div className="relative aspect-[3/4] max-h-[58svh] min-h-80 overflow-hidden rounded-xl bg-[#0b0d11] sm:aspect-video sm:max-h-[68vh]">
       <video ref={videoRef} className="h-full w-full object-cover" muted playsInline aria-label="QR scanner camera preview" />
       {!enabled && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-[radial-gradient(circle_at_center,rgba(37,99,235,0.14),transparent_50%)] text-slate-300">
-          <span className="grid h-16 w-16 place-items-center rounded-2xl bg-white/10"><Camera size={32} /></span>
-          <span className="text-sm font-medium">Camera is ready to start</span>
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 text-white/70">
+          <span className="grid h-14 w-14 place-items-center rounded-2xl bg-white/10"><Camera size={26} strokeWidth={1.75} /></span>
+          <span className="text-base">Camera is ready to start</span>
         </div>
       )}
       {enabled && starting && (
-        <div className="absolute inset-0 flex items-center justify-center bg-slate-950/70 text-white">
-          <LoaderCircle className="animate-spin" size={30} />
-          <span className="ml-2 text-sm">Starting camera…</span>
+        <div className="absolute inset-0 flex items-center justify-center gap-2 bg-black/60 text-white">
+          <LoaderCircle className="animate-spin" size={22} />
+          <span className="text-base">Starting camera…</span>
         </div>
       )}
       {enabled && !starting && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-          <div className={`relative h-52 w-52 rounded-2xl border-4 shadow-[0_0_0_999px_rgba(2,6,23,0.22)] transition sm:h-56 sm:w-56 ${processing ? 'border-blue-400' : 'border-white/90'}`}>
-            {!processing && <span className="scanner-line absolute inset-x-3 top-4 h-0.5 bg-blue-400 shadow-[0_0_10px_rgba(96,165,250,0.9)]" />}
+          <div className={`relative h-52 w-52 rounded-2xl border-2 shadow-[0_0_0_999px_rgba(0,0,0,0.35)] transition-colors sm:h-56 sm:w-56 ${processing ? 'border-accent' : 'border-white/90'}`}>
+            {!processing && <span className="scanner-line absolute inset-x-3 top-4 h-px bg-accent shadow-[0_0_12px_rgb(var(--accent))]" />}
             <span className="sr-only">Place the QR code inside the frame</span>
           </div>
-          <span className="absolute bottom-5 rounded-full bg-slate-950/65 px-3 py-1.5 text-xs font-medium text-white backdrop-blur">Align the QR code inside the frame</span>
+          <span className="absolute bottom-4 rounded-full bg-black/60 px-3 py-1 text-meta text-white backdrop-blur">
+            Align the QR code inside the frame
+          </span>
         </div>
       )}
       {processing && (
-        <div className="absolute inset-x-0 bottom-0 bg-blue-700/95 px-4 py-3 text-center text-sm font-medium text-white">
+        <div className="absolute inset-x-0 bottom-0 bg-accent px-4 py-2.5 text-center text-base font-medium text-white">
           Processing scan…
         </div>
       )}

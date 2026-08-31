@@ -41,19 +41,12 @@ export function useTheme() {
   return context
 }
 
-export function ThemeToggle({ compact = false, darkSurface = false }: { compact?: boolean; darkSurface?: boolean }) {
+export function ThemeToggle({ className = 'icon-btn' }: { className?: string }) {
   const { theme, toggleTheme } = useTheme()
   const nextLabel = theme === 'dark' ? 'Use light mode' : 'Use dark mode'
   return (
-    <button
-      type="button"
-      className={compact ? `icon-btn ${darkSurface ? 'border-white/10 bg-white/5 text-slate-300 hover:bg-white/10 hover:text-white' : ''}` : 'btn-ghost w-full justify-start'}
-      onClick={toggleTheme}
-      aria-label={nextLabel}
-      title={nextLabel}
-    >
-      {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
-      {!compact && <span>{theme === 'dark' ? 'Light mode' : 'Dark mode'}</span>}
+    <button type="button" className={className} onClick={toggleTheme} aria-label={nextLabel} title={nextLabel}>
+      {theme === 'dark' ? <Sun size={16} /> : <Moon size={16} />}
     </button>
   )
 }

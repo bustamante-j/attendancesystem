@@ -1,6 +1,5 @@
-import { AlertTriangle } from 'lucide-react'
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from 'react'
-import { Modal } from './Modal'
+import { Modal, ModalActions } from './Modal'
 
 export interface ConfirmOptions {
   title: string
@@ -30,17 +29,14 @@ export function ConfirmProvider({ children }: { children: ReactNode }) {
     <ConfirmContext.Provider value={value}>
       {children}
       {pending && (
-        <Modal title={pending.title} onClose={() => respond(false)} size="md">
-          <div className="space-y-5">
-            <div className={`flex h-12 w-12 items-center justify-center rounded-2xl ${pending.tone === 'danger' ? 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300' : 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'}`}>
-              <AlertTriangle size={24} />
-            </div>
-            <p className="leading-6 text-slate-600 dark:text-slate-300">{pending.message}</p>
-            <div className="flex flex-col-reverse gap-3 border-t border-slate-200 pt-4 dark:border-slate-700 sm:flex-row sm:justify-end">
-              <button className="btn-secondary" autoFocus onClick={() => respond(false)}>Cancel</button>
-              <button className={pending.tone === 'danger' ? 'btn-danger' : 'btn-primary'} onClick={() => respond(true)}>{pending.confirmLabel ?? 'Confirm'}</button>
-            </div>
-          </div>
+        <Modal title={pending.title} onClose={() => respond(false)} size="sm">
+          <p className="text-base leading-relaxed text-muted">{pending.message}</p>
+          <ModalActions>
+            <button className="btn-secondary" autoFocus onClick={() => respond(false)}>Cancel</button>
+            <button className={pending.tone === 'danger' ? 'btn-danger' : 'btn-primary'} onClick={() => respond(true)}>
+              {pending.confirmLabel ?? 'Confirm'}
+            </button>
+          </ModalActions>
         </Modal>
       )}
     </ConfirmContext.Provider>

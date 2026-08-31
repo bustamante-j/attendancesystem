@@ -12,8 +12,8 @@ import {
   UserRoundCog,
   X,
 } from 'lucide-react'
-import { useState } from 'react'
-import { NavLink, Outlet } from 'react-router-dom'
+import { useEffect, useState } from 'react'
+import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthProvider'
 import { usePwaInstall } from '../features/pwa/usePwaInstall'
 import { ThemeToggle } from '../features/theme/ThemeProvider'
@@ -22,18 +22,22 @@ import { BrandLogo } from './BrandLogo'
 export function AppLayout() {
   const { profile, signOut } = useAuth()
   const { canInstall, install } = usePwaInstall()
+  const { pathname } = useLocation()
   const [open, setOpen] = useState(false)
+
+  useEffect(() => { setOpen(false) }, [pathname])
+
   if (!profile) return null
 
   const links = profile.role === 'super_admin'
     ? [
         { to: '/', label: 'Dashboard', icon: LayoutDashboard },
         { to: '/students', label: 'Students', icon: Users },
-        { to: '/departments', label: 'Departments', icon: Building2 },
         { to: '/events', label: 'Events', icon: CalendarDays },
         { to: '/reports', label: 'Reports', icon: BarChart3 },
+        { to: '/departments', label: 'Departments', icon: Building2 },
         { to: '/users', label: 'Users', icon: UserRoundCog },
-        { to: '/activity-log', label: 'Activity Log', icon: ScrollText },
+        { to: '/activity-log', label: 'Activity', icon: ScrollText },
         ...(import.meta.env.DEV ? [{ to: '/dev', label: 'Dev Tools', icon: Code2 }] : []),
       ]
     : profile.role === 'admin'
@@ -44,14 +48,14 @@ export function AppLayout() {
           { to: '/reports', label: 'Reports', icon: BarChart3 },
           { to: '/users', label: 'Users', icon: UserRoundCog },
         ]
-    : profile.role === 'faculty'
-      ? [
-          { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-          { to: '/students', label: 'Students', icon: Users },
-          { to: '/events', label: 'Events', icon: CalendarDays },
-          { to: '/reports', label: 'Reports', icon: BarChart3 },
-        ]
-      : [{ to: '/events', label: 'Assigned Events', icon: CalendarDays }]
+      : profile.role === 'faculty'
+        ? [
+            { to: '/', label: 'Dashboard', icon: LayoutDashboard },
+            { to: '/students', label: 'Students', icon: Users },
+            { to: '/events', label: 'Events', icon: CalendarDays },
+            { to: '/reports', label: 'Reports', icon: BarChart3 },
+          ]
+        : [{ to: '/events', label: 'Assigned Events', icon: CalendarDays }]
 
   const initials = profile.full_name
     .split(/\s+/)
@@ -63,7 +67,7 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen md:flex">
-      <header className="fixed inset-x-0 top-0 z-30 flex h-16 items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 shadow-sm backdrop-blur md:hidden dark:border-slate-800 dark:bg-slate-950/90">
+      <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-surface/90 px-3 backdrop-blur md:hidden">
         <button
           type="button"
           className="icon-btn"
@@ -71,73 +75,90 @@ export function AppLayout() {
           aria-expanded={open}
           onClick={() => setOpen(!open)}
         >
-          {open ? <X size={20} /> : <Menu size={20} />}
+          {open ? <X size={19} /> : <Menu size={19} />}
         </button>
-        <div className="flex items-center gap-2.5">
-          <BrandLogo markOnly className="h-9 w-9" />
-          <span className="font-bold tracking-tight text-slate-950 dark:text-white">Attendly</span>
+        <div className="flex items-center gap-2">
+          <BrandLogo markOnly className="h-7 w-7" />
+          <span className="font-semibold tracking-tight text-ink">Attendly</span>
         </div>
-        <ThemeToggle compact />
+        <ThemeToggle />
       </header>
 
       {open && (
         <button
           type="button"
           aria-label="Close navigation"
-          className="fixed inset-0 z-10 bg-slate-950/60 backdrop-blur-sm md:hidden"
+          className="fixed inset-0 z-20 bg-ink/40 backdrop-blur-[2px] md:hidden"
           onClick={() => setOpen(false)}
         />
       )}
 
-      <aside className={`${open ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 z-20 flex h-screen w-72 shrink-0 flex-col bg-slate-950 text-white shadow-2xl transition-transform duration-200 md:sticky md:top-0 md:translate-x-0 md:shadow-none`}>
-        <div className="flex items-center gap-3 border-b border-white/10 px-6 py-5">
-          <BrandLogo markOnly className="h-11 w-11" />
-          <div>
-            <div className="text-lg font-bold tracking-tight">Attendly</div>
-            <div className="text-xs text-slate-400">Attendance made simple</div>
+      {/* Fixed dark brand rail. It keeps its own surface in both themes and stays
+          put while the main column scrolls. */}
+      <aside
+        className={`${open ? 'translate-x-0' : '-translate-x-full'} fixed inset-y-0 z-30 flex h-screen w-64 shrink-0 flex-col bg-sidebar transition-transform duration-200 md:sticky md:top-0 md:translate-x-0`}
+      >
+        <div className="flex items-center gap-2.5 border-b border-sidebar-line px-4 py-4">
+          <BrandLogo markOnly className="h-8 w-8" />
+          <div className="min-w-0">
+            <div className="text-lg font-semibold leading-tight tracking-tight text-sidebar-ink">Attendly</div>
+            <div className="text-meta text-sidebar-muted">Attendance made simple</div>
           </div>
         </div>
 
-        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-3 py-5" aria-label="Main navigation">
-          <div className="mb-2 px-3 text-[0.68rem] font-bold uppercase tracking-[0.16em] text-slate-500">Workspace</div>
+        <nav className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2.5 py-3" aria-label="Main navigation">
+          <div className="mb-1.5 px-2.5 text-micro font-semibold uppercase tracking-wider text-sidebar-muted/70">
+            Workspace
+          </div>
           {links.map(({ to, label, icon: Icon }) => (
             <NavLink
               key={to}
               to={to}
               end={to === '/'}
-              onClick={() => setOpen(false)}
-              className={({ isActive }) => `group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition ${isActive ? 'bg-blue-600 text-white shadow-lg shadow-blue-950/30' : 'text-slate-300 hover:bg-white/10 hover:text-white'}`}
+              className={({ isActive }) => `flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-base transition-colors ${
+                isActive
+                  ? 'bg-accent font-medium text-white'
+                  : 'text-sidebar-muted hover:bg-white/[0.07] hover:text-sidebar-ink'
+              }`}
             >
-              <Icon size={18} className="shrink-0" />
+              <Icon className="shrink-0" size={17} strokeWidth={1.9} />
               <span>{label}</span>
             </NavLink>
           ))}
         </nav>
 
-        <div className="border-t border-white/10 p-4">
+        <div className="border-t border-sidebar-line p-2.5">
           {canInstall && (
-            <button className="btn mb-3 w-full border border-blue-400/20 bg-blue-500/15 text-blue-100 hover:bg-blue-500/25" onClick={() => void install()}>
-              <MonitorDown size={16} /> Install Attendly
+            <button
+              className="btn mb-1.5 w-full justify-start bg-white/[0.07] text-sidebar-ink hover:bg-white/[0.12]"
+              onClick={() => void install()}
+            >
+              <MonitorDown size={16} /> Install app
             </button>
           )}
-          <div className="mb-3 flex items-center gap-3 rounded-xl bg-white/5 p-3">
-            <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-blue-500/20 text-xs font-bold text-blue-300">
+          <div className="flex items-center gap-2.5 rounded-lg bg-white/[0.05] px-2.5 py-2">
+            <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-accent/25 text-micro font-semibold text-white">
               {initials || 'A'}
             </span>
             <div className="min-w-0 flex-1">
-              <div className="truncate text-sm font-semibold text-white">{profile.full_name}</div>
-              <div className="truncate text-xs capitalize text-slate-400">{profile.role.replace('_', ' ')}</div>
+              <div className="truncate text-base font-medium text-sidebar-ink">{profile.full_name}</div>
+              <div className="truncate text-meta capitalize text-sidebar-muted">{profile.role.replace('_', ' ')}</div>
             </div>
-            <ThemeToggle compact darkSurface />
           </div>
-          <button className="btn w-full border-white/10 bg-white/5 text-slate-200 hover:bg-white/10 hover:text-white" onClick={() => void signOut()}>
-            <LogOut size={16} /> Sign out
-          </button>
+          <div className="mt-1.5 flex items-center gap-1.5">
+            <button
+              className="btn flex-1 justify-start text-sidebar-muted hover:bg-white/[0.07] hover:text-sidebar-ink"
+              onClick={() => void signOut()}
+            >
+              <LogOut size={16} /> Sign out
+            </button>
+            <ThemeToggle className="inline-grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sidebar-muted transition-colors hover:bg-white/[0.07] hover:text-sidebar-ink" />
+          </div>
         </div>
       </aside>
 
-      <main className="min-w-0 flex-1 px-4 pb-8 pt-20 sm:px-6 md:p-8 lg:p-10">
-        <div className="mx-auto w-full max-w-[1600px]">
+      <main className="min-w-0 flex-1 px-4 pb-12 pt-[4.5rem] sm:px-6 md:px-8 md:pb-16 md:pt-8">
+        <div className="mx-auto w-full max-w-[1360px]">
           <Outlet />
         </div>
       </main>

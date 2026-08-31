@@ -9,7 +9,6 @@ import {
   RefreshCw,
   RotateCcw,
   ScanLine,
-  Search,
   SearchX,
   ShieldCheck,
   UserRoundCheck,
@@ -18,10 +17,13 @@ import {
 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, Navigate, useParams } from 'react-router-dom'
+import { ActionMenu } from '../components/ActionMenu'
 import { Alert } from '../components/Alert'
 import { useConfirm } from '../components/ConfirmDialog'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingScreen } from '../components/LoadingScreen'
+import { SearchInput } from '../components/SearchInput'
+import { StatusBadge, type StatusTone } from '../components/StatusBadge'
 import { AddRosterAttendeeModal } from '../features/attendance/AddRosterAttendeeModal'
 import { exportEventRoster } from '../features/attendance/exportEventRoster'
 import { RosterEntryModal, type RosterEditTarget } from '../features/attendance/RosterEntryModal'
@@ -42,41 +44,26 @@ import type {
   EventGuestAttendance,
   EventRecord,
   EventRosterStudentRow,
+  EventStatus,
 } from '../types/app'
 import { formatManilaDate } from '../utils/dates'
 
 const PAGE_SIZE = 50
-type SortField = 'name' | 'identity' | 'department' | 'year' | 'status' | 'time' | 'method'
+type SortField = 'name' | 'identity' | 'department' | 'status' | 'time'
 
 type DisplayRosterRow =
   | { key: string; kind: 'student'; row: EventRosterStudentRow }
   | { key: string; kind: 'guest'; row: EventGuestAttendance }
 
-function statusStyle(status: AttendanceReportStatus) {
-  if (status === 'present') return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-200'
-  if (status === 'late') return 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-200'
-  return 'bg-slate-200 text-slate-700 dark:bg-slate-800 dark:text-slate-300'
-}
+const attendanceTone: Record<AttendanceReportStatus, StatusTone> = { present: 'ok', late: 'warn', absent: 'neutral' }
+const eventTone: Record<EventStatus, StatusTone> = { open: 'ok', draft: 'warn', closed: 'neutral' }
 
-function EventMetric({ label, value, tone = 'slate', icon: Icon }: {
-  label: string
-  value: number
-  tone?: 'slate' | 'green' | 'amber' | 'blue'
-  icon: typeof UsersRound
-}) {
-  const colors = {
-    slate: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
-    green: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/70 dark:text-emerald-300',
-    amber: 'bg-amber-100 text-amber-700 dark:bg-amber-950/70 dark:text-amber-300',
-    blue: 'bg-blue-100 text-blue-700 dark:bg-blue-950/70 dark:text-blue-300',
-  }
-  return (
-    <div className="roster-metric">
-      <div><div className="text-xs font-semibold text-slate-500 dark:text-slate-400">{label}</div><div className="mt-1 text-2xl font-bold tabular-nums tracking-tight">{value.toLocaleString()}</div></div>
-      <span className={`grid h-10 w-10 place-items-center rounded-xl ${colors[tone]}`}><Icon size={20} /></span>
-    </div>
-  )
-}
+const SORT_COLUMNS: { field: SortField; label: string }[] = [
+  { field: 'name', label: 'Attendee' },
+  { field: 'department', label: 'Department' },
+  { field: 'status', label: 'Status' },
+  { field: 'time', label: 'Recorded' },
+]
 
 export function EventAttendancePage() {
   const { eventId } = useParams()
@@ -194,6 +181,7 @@ export function EventAttendancePage() {
     ...students.map((row) => ({ key: `student:${row.student_id}`, kind: 'student' as const, row })),
     ...guests.map((row) => ({ key: `guest:${row.id}`, kind: 'guest' as const, row })),
   ], [guests, students])
+
   const filteredRows = useMemo(() => displayRows.filter((item) => {
     const needle = search.trim().toLowerCase()
     const identity = item.kind === 'student'
@@ -212,10 +200,8 @@ export function EventAttendancePage() {
       if (sortField === 'name') return item.row.full_name
       if (sortField === 'identity') return item.kind === 'student' ? item.row.student_number : item.row.reference_number ?? ''
       if (sortField === 'department') return item.kind === 'student' ? item.row.department_code : item.row.affiliation ?? ''
-      if (sortField === 'year') return item.kind === 'student' ? item.row.year_level : 99
       if (sortField === 'status') return item.row.attendance_status
-      if (sortField === 'time') return item.kind === 'student' ? item.row.check_in_at ?? '' : item.row.recorded_at
-      return item.kind === 'student' ? item.row.check_in_method ?? '' : 'manual'
+      return item.kind === 'student' ? item.row.check_in_at ?? '' : item.row.recorded_at
     }
     const leftValue = value(left)
     const rightValue = value(right)
@@ -224,6 +210,7 @@ export function EventAttendancePage() {
       : String(leftValue).localeCompare(String(rightValue), undefined, { numeric: true })
     return sortDirection === 'asc' ? comparison : -comparison
   }), [attendeeType, department, displayRows, search, sex, sortDirection, sortField, status, year])
+
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
   const safePage = Math.min(page, pageCount)
   const pageRows = filteredRows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
@@ -352,115 +339,272 @@ export function EventAttendancePage() {
 
   if (!eventId) return <Navigate to="/events" replace />
   if (loading) return <LoadingScreen label="Preparing attendance roster…" />
-  if (!eventRecord) return <div className="mx-auto max-w-2xl space-y-4"><Link className="btn-secondary" to="/events">Back to events</Link><Alert message={message?.text ?? 'The event could not be loaded.'} /></div>
+  if (!eventRecord) {
+    return (
+      <div className="mx-auto max-w-xl space-y-4">
+        <Link className="btn-secondary" to="/events">Back to events</Link>
+        <Alert message={message?.text ?? 'The event could not be loaded.'} />
+      </div>
+    )
+  }
+
+  const showingFrom = filteredRows.length ? (safePage - 1) * PAGE_SIZE + 1 : 0
+  const showingTo = Math.min(safePage * PAGE_SIZE, filteredRows.length)
 
   return (
-    <div className="space-y-5">
-      <header className="page-header gap-y-3">
+    <div className="page">
+      <header className="page-header">
         <div className="min-w-0 flex-1">
-          <div className="mb-2 flex min-w-0 items-center gap-2 text-sm text-slate-500"><Link className="font-medium text-blue-700 hover:text-blue-800 dark:text-blue-300" to="/events">Events</Link><span>/</span><span className="truncate">{eventRecord.name}</span></div>
-          <div className="flex flex-wrap items-center gap-2.5"><h1 className="page-title">Attendance roster</h1><span className={`status-chip capitalize ${eventRecord.status === 'open' ? 'bg-emerald-100 text-emerald-800' : eventRecord.status === 'closed' ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-800'}`}>{eventRecord.status}</span>{eventRecord.attendance_finalized_at && <span className="status-chip bg-blue-100 text-blue-800"><ShieldCheck size={13} /> Finalized</span>}</div>
-          <p className="page-subtitle">Manage registered and temporary attendance for {eventRecord.name}. Registered changes update reports automatically.</p>
+          <div className="mb-2 flex min-w-0 items-center gap-1.5 text-meta text-muted">
+            <Link className="link" to="/events">Events</Link>
+            <span aria-hidden="true">/</span>
+            <span className="truncate">{eventRecord.name}</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-2.5">
+            <h1 className="page-title">Attendance roster</h1>
+            <StatusBadge tone={eventTone[eventRecord.status]} variant="soft">{eventRecord.status}</StatusBadge>
+            {eventRecord.attendance_finalized_at && (
+              <span className="badge badge-accent"><ShieldCheck size={12} /> Finalized</span>
+            )}
+          </div>
+          <p className="page-subtitle">
+            {guests.length} temporary attendee{guests.length === 1 ? '' : 's'}
+            {lastUpdated && <> · Updated {lastUpdated.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })}</>}
+          </p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <button className="btn-secondary" disabled={refreshing} onClick={() => void refreshRoster(true)}><RefreshCw className={refreshing ? 'animate-spin' : ''} size={16} /> Refresh</button>
-          {!eventRecord.is_historical && <Link className="btn-secondary" to={`/events/${eventRecord.id}/scanner`}><ScanLine size={16} /> Open scanner</Link>}
-          <button className="btn-primary" disabled={exporting || !filteredRows.length} onClick={() => void exportRoster()}><Download size={16} /> {exporting ? 'Exporting…' : 'Export roster'}</button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button className="icon-btn" disabled={refreshing} onClick={() => void refreshRoster(true)} aria-label="Refresh roster">
+            <RefreshCw className={refreshing ? 'animate-spin' : ''} size={15} />
+          </button>
+          {!eventRecord.is_historical && (
+            <Link className="btn-secondary" to={`/events/${eventRecord.id}/scanner`}><ScanLine size={15} /> Scanner</Link>
+          )}
+          <button className="btn-primary" disabled={exporting || !filteredRows.length} onClick={() => void exportRoster()}>
+            <Download size={15} /> {exporting ? 'Exporting…' : 'Export'}
+          </button>
+          <ActionMenu
+            label="Roster options"
+            items={[
+              canEditRoster && { icon: RotateCcw, label: 'Undo latest change', disabled: !!busyAction, onSelect: () => void undoLatest() },
+              eventRecord.status === 'closed' && canEditRoster && !eventRecord.attendance_finalized_at && {
+                icon: LockKeyhole, label: 'Finalize roster', disabled: !!busyAction, onSelect: () => void toggleFinalized(true),
+              },
+              canReopenRoster && { icon: RotateCcw, label: 'Reopen roster', disabled: !!busyAction, onSelect: () => void toggleFinalized(false) },
+            ]}
+          />
         </div>
       </header>
 
       <EventWorkspaceNav eventRecord={eventRecord} active="roster" canViewReports={canViewReports} />
+
       {message && <Alert message={message.text} tone={message.tone} />}
       {eventRecord.attendance_finalized_at ? (
-        <Alert tone="info" message={`This roster was finalized on ${formatManilaDate(eventRecord.attendance_finalized_at)}. It is read-only until a Super Admin reopens it.`} />
+        <Alert tone="info" message={`Finalized on ${formatManilaDate(eventRecord.attendance_finalized_at)}. Read-only until a Super Admin reopens it.`} />
       ) : eventRecord.status === 'draft' ? (
         <Alert tone="info" message="This event is still a draft. Open it before recording attendance." />
       ) : !canManageRoster ? (
-        <Alert tone="info" message="You can monitor this roster, but attendance corrections are limited to authorized event managers." />
+        <Alert tone="info" message="You can monitor this roster, but corrections are limited to authorized event managers." />
       ) : null}
 
-      <section className="grid grid-cols-2 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:grid-cols-4" aria-label="Attendance summary">
-        <EventMetric label="Expected" value={summary.expected} icon={UsersRound} />
-        <EventMetric label="Present" value={summary.present} tone="green" icon={UserRoundCheck} />
-        <EventMetric label="Late" value={summary.late} tone="amber" icon={Clock3} />
-        <EventMetric label="Remaining" value={summary.remaining} tone="blue" icon={UsersRound} />
+      <section className="stat-strip grid-cols-2 lg:grid-cols-4" aria-label="Attendance summary">
+        <div className="stat">
+          <div className="stat-label"><UsersRound className="mr-1 inline align-[-2px] text-subtle" size={13} /> Expected</div>
+          <div className="stat-value">{summary.expected.toLocaleString()}</div>
+        </div>
+        <div className="stat">
+          <div className="stat-label"><UserRoundCheck className="mr-1 inline align-[-2px] text-ok" size={13} /> Present</div>
+          <div className="stat-value">{summary.present.toLocaleString()}</div>
+        </div>
+        <div className="stat">
+          <div className="stat-label"><Clock3 className="mr-1 inline align-[-2px] text-warn" size={13} /> Late</div>
+          <div className="stat-value">{summary.late.toLocaleString()}</div>
+        </div>
+        <div className="stat">
+          <div className="stat-label"><UsersRound className="mr-1 inline align-[-2px] text-subtle" size={13} /> Remaining</div>
+          <div className="stat-value">{summary.remaining.toLocaleString()}</div>
+        </div>
       </section>
 
-      <section className="roster-surface">
-        <div className="roster-toolbar">
-          <label className="relative w-full sm:w-52" aria-label="Search roster">
-            <Search className="pointer-events-none absolute left-3.5 top-3 text-slate-400" size={18} />
-            <input className="field pl-10" placeholder="Search name, student ID, or reference" value={search} onChange={(inputEvent) => setSearch(inputEvent.target.value)} />
-          </label>
-          <select aria-label="Filter attendance status" className="field roster-filter" value={status} onChange={(inputEvent) => setStatus(inputEvent.target.value)}><option value="all">All statuses</option><option value="present">Present</option><option value="late">Late</option><option value="absent">Absent</option></select>
-          <select aria-label="Filter attendee type" className="field roster-filter" value={attendeeType} onChange={(inputEvent) => setAttendeeType(inputEvent.target.value)}><option value="all">All attendees</option><option value="registered">Registered</option><option value="temporary">Temporary</option></select>
-          <select aria-label="Filter department" className="field roster-filter-department" value={department} onChange={(inputEvent) => setDepartment(inputEvent.target.value)}><option value="all">All departments</option>{departments.map((item) => <option key={item.id} value={item.id}>{item.code}</option>)}</select>
-          <select aria-label="Filter year level" className="field roster-filter" value={year} onChange={(inputEvent) => setYear(inputEvent.target.value)}><option value="all">All years</option>{[1, 2, 3, 4].map((item) => <option key={item} value={item}>Year {item}</option>)}</select>
-          <select aria-label="Filter sex" className="field roster-filter-sex" value={sex} onChange={(inputEvent) => setSex(inputEvent.target.value)}><option value="all">All sexes</option><option value="Female">Female</option><option value="Male">Male</option></select>
-          {canEditRoster && <button className="btn-secondary whitespace-nowrap" onClick={() => setAddOpen(true)}><Plus size={16} /> Add attendee</button>}
-        </div>
+      <div className="filter-bar">
+        <SearchInput value={search} onChange={setSearch} placeholder="Search name, ID, or reference" className="min-w-52 flex-1" />
+        <select aria-label="Filter attendance status" className="field w-auto min-w-28" value={status} onChange={(event) => setStatus(event.target.value)}>
+          <option value="all">All statuses</option>
+          <option value="present">Present</option>
+          <option value="late">Late</option>
+          <option value="absent">Absent</option>
+        </select>
+        <select aria-label="Filter attendee type" className="field w-auto min-w-28" value={attendeeType} onChange={(event) => setAttendeeType(event.target.value)}>
+          <option value="all">All attendees</option>
+          <option value="registered">Registered</option>
+          <option value="temporary">Temporary</option>
+        </select>
+        <select aria-label="Filter department" className="field w-auto min-w-28" value={department} onChange={(event) => setDepartment(event.target.value)}>
+          <option value="all">All departments</option>
+          {departments.map((item) => <option key={item.id} value={item.id}>{item.code}</option>)}
+        </select>
+        <select aria-label="Filter year level" className="field w-auto min-w-24" value={year} onChange={(event) => setYear(event.target.value)}>
+          <option value="all">All years</option>
+          {[1, 2, 3, 4].map((item) => <option key={item} value={item}>Year {item}</option>)}
+        </select>
+        <select aria-label="Filter sex" className="field w-auto min-w-24" value={sex} onChange={(event) => setSex(event.target.value)}>
+          <option value="all">All sexes</option>
+          <option value="Female">Female</option>
+          <option value="Male">Male</option>
+        </select>
+        {canEditRoster && (
+          <button className="btn-secondary whitespace-nowrap" onClick={() => setAddOpen(true)}><Plus size={15} /> Add attendee</button>
+        )}
+      </div>
 
-        {(selectedStudentIds.size > 0 || canEditRoster) && (
-          <div className={`roster-bulk-bar ${selectedStudentIds.size ? 'roster-bulk-bar-active' : ''}`}>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="min-w-24 text-sm font-semibold text-blue-800 dark:text-blue-200">{selectedStudentIds.size ? `${selectedStudentIds.size} selected` : 'Bulk actions'}</span>
-              <button className="roster-bulk-button text-emerald-700" disabled={!selectedStudentIds.size || !!busyAction} onClick={() => void applyBulkStatus('present')}><Check size={15} /> Mark present</button>
-              <button className="roster-bulk-button text-amber-700" disabled={!selectedStudentIds.size || !!busyAction} onClick={() => void applyBulkStatus('late')}><Clock3 size={15} /> Mark late</button>
-              <button className="roster-bulk-button text-slate-700" disabled={!selectedStudentIds.size || !!busyAction} onClick={() => void applyBulkStatus('absent')}><X size={15} /> Mark absent</button>
-              {selectedStudentIds.size > 0 && <button className="btn-ghost min-h-9 px-2.5 py-1.5" disabled={!!busyAction} onClick={() => setSelectedStudentIds(new Set())}>Clear selection</button>}
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="text-xs text-slate-500">{guests.length} temporary attendee{guests.length === 1 ? '' : 's'} · {lastUpdated ? `Updated ${lastUpdated.toLocaleTimeString('en-PH', { hour: 'numeric', minute: '2-digit' })}` : 'Not updated yet'}</span>
-              {canEditRoster && <button className="btn-secondary min-h-9 px-3 py-1.5" disabled={!!busyAction} onClick={() => void undoLatest()}><RotateCcw size={15} /> {busyAction === 'undo' ? 'Undoing…' : 'Undo latest change'}</button>}
-              {eventRecord.status === 'closed' && canEditRoster && !eventRecord.attendance_finalized_at && <button className="btn-secondary min-h-9 px-3 py-1.5" disabled={!!busyAction} onClick={() => void toggleFinalized(true)}><LockKeyhole size={15} /> Finalize</button>}
-              {canReopenRoster && <button className="btn-secondary min-h-9 px-3 py-1.5" disabled={!!busyAction} onClick={() => void toggleFinalized(false)}><RotateCcw size={15} /> Reopen roster</button>}
-            </div>
+      <section className="table-shell">
+        {/* Bulk actions surface only when there is a selection to act on. */}
+        {selectedStudentIds.size > 0 && (
+          <div className="flex flex-wrap items-center gap-2 border-b border-line bg-accent-soft px-4 py-2.5">
+            <span className="text-base font-medium text-accent-ink">{selectedStudentIds.size} selected</span>
+            <button className="btn-secondary btn-sm" disabled={!!busyAction} onClick={() => void applyBulkStatus('present')}>
+              <Check size={14} /> Present
+            </button>
+            <button className="btn-secondary btn-sm" disabled={!!busyAction} onClick={() => void applyBulkStatus('late')}>
+              <Clock3 size={14} /> Late
+            </button>
+            <button className="btn-secondary btn-sm" disabled={!!busyAction} onClick={() => void applyBulkStatus('absent')}>
+              <X size={14} /> Absent
+            </button>
+            <button className="btn-ghost btn-sm ml-auto" disabled={!!busyAction} onClick={() => setSelectedStudentIds(new Set())}>
+              Clear
+            </button>
           </div>
         )}
 
-        <div className="overflow-x-auto">
-          <table className="roster-table">
-            <thead><tr><th className="w-12"><input aria-label="Select all registered students on this page" checked={allPageStudentsSelected} disabled={!canEditRoster || !pageStudentIds.length} type="checkbox" onChange={togglePageStudents} /></th><th aria-sort={sortField === 'name' ? sortDirection === 'asc' ? 'ascending' : 'descending' : 'none'}><button className="table-sort-button" onClick={() => changeSort('name')}>Student / attendee <ArrowUpDown size={13} /></button></th><th aria-sort={sortField === 'identity' ? sortDirection === 'asc' ? 'ascending' : 'descending' : 'none'}><button className="table-sort-button" onClick={() => changeSort('identity')}>ID number <ArrowUpDown size={13} /></button></th><th aria-sort={sortField === 'department' ? sortDirection === 'asc' ? 'ascending' : 'descending' : 'none'}><button className="table-sort-button" onClick={() => changeSort('department')}>Department <ArrowUpDown size={13} /></button></th><th aria-sort={sortField === 'year' ? sortDirection === 'asc' ? 'ascending' : 'descending' : 'none'}><button className="table-sort-button" onClick={() => changeSort('year')}>Year <ArrowUpDown size={13} /></button></th><th aria-sort={sortField === 'status' ? sortDirection === 'asc' ? 'ascending' : 'descending' : 'none'}><button className="table-sort-button" onClick={() => changeSort('status')}>Status <ArrowUpDown size={13} /></button></th><th aria-sort={sortField === 'time' ? sortDirection === 'asc' ? 'ascending' : 'descending' : 'none'}><button className="table-sort-button" onClick={() => changeSort('time')}>Time recorded <ArrowUpDown size={13} /></button></th><th aria-sort={sortField === 'method' ? sortDirection === 'asc' ? 'ascending' : 'descending' : 'none'}><button className="table-sort-button" onClick={() => changeSort('method')}>Method <ArrowUpDown size={13} /></button></th><th>Remarks</th><th className="text-right">Actions</th></tr></thead>
+        <div className="table-scroll">
+          <table className="min-w-[62rem]">
+            <thead>
+              <tr>
+                <th className="w-10">
+                  <input
+                    aria-label="Select all registered students on this page"
+                    checked={allPageStudentsSelected}
+                    disabled={!canEditRoster || !pageStudentIds.length}
+                    type="checkbox"
+                    onChange={togglePageStudents}
+                  />
+                </th>
+                {SORT_COLUMNS.map(({ field, label }) => (
+                  <th key={field} aria-sort={sortField === field ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}>
+                    <button className="table-sort" onClick={() => changeSort(field)}>
+                      {label} <ArrowUpDown size={12} className={sortField === field ? 'text-accent' : 'opacity-50'} />
+                    </button>
+                  </th>
+                ))}
+                <th>Remarks</th>
+                <th className="w-12" aria-label="Actions" />
+              </tr>
+            </thead>
             <tbody>
               {pageRows.map((item) => {
                 if (item.kind === 'student') {
                   const row = item.row
-                  return <tr key={item.key} className={selectedStudentIds.has(row.student_id) ? 'roster-row-selected' : ''}>
-                    <td><input aria-label={`Select ${row.full_name}`} checked={selectedStudentIds.has(row.student_id)} disabled={!canEditRoster} type="checkbox" onChange={() => toggleStudent(row.student_id)} /></td>
-                    <td><div className="font-semibold text-slate-900 dark:text-slate-100">{row.full_name}</div><div className="mt-0.5 text-xs text-slate-500">{row.sex}{!row.is_expected && <span className="ml-2 font-medium text-amber-700 dark:text-amber-300">Outside expected audience</span>}</div></td>
-                    <td className="font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">{row.student_number}</td>
-                    <td><span className="font-medium">{row.department_code}</span><div className="max-w-44 truncate text-xs text-slate-500" title={row.department_name}>{row.department_name}</div></td>
-                    <td>{row.year_level}</td>
-                    <td><span className={`status-chip capitalize ${statusStyle(row.attendance_status)}`}>{row.attendance_status}</span></td>
-                    <td className="whitespace-nowrap">{row.check_in_at ? formatManilaDate(row.check_in_at) : '—'}</td>
-                    <td><span className="text-xs font-semibold uppercase text-slate-500">{row.check_in_method ?? '—'}</span></td>
-                    <td><span className="block max-w-56 truncate text-sm text-slate-600 dark:text-slate-300" title={row.remarks ?? ''}>{row.remarks || '—'}</span></td>
-                    <td><div className="flex justify-end">{canEditRoster ? <button className="btn-secondary min-h-9 px-3 py-1.5" onClick={() => setEditing({ kind: 'student', row })}><Pencil size={14} /> Edit</button> : <span className="text-xs text-slate-400">Read only</span>}</div></td>
-                  </tr>
+                  return (
+                    <tr key={item.key} className={selectedStudentIds.has(row.student_id) ? 'bg-accent-soft/60' : ''}>
+                      <td>
+                        <input
+                          aria-label={`Select ${row.full_name}`}
+                          checked={selectedStudentIds.has(row.student_id)}
+                          disabled={!canEditRoster}
+                          type="checkbox"
+                          onChange={() => toggleStudent(row.student_id)}
+                        />
+                      </td>
+                      <td>
+                        <div className="cell-title">{row.full_name}</div>
+                        <div className="cell-meta">
+                          <span className="font-mono">{row.student_number}</span>
+                          <span className="px-1.5 text-line-strong">·</span>
+                          {row.sex}
+                          {!row.is_expected && <span className="ml-2 text-warn-ink">Outside audience</span>}
+                        </div>
+                      </td>
+                      <td>
+                        <div className="text-ink">{row.department_code}</div>
+                        <div className="cell-meta">Year {row.year_level}</div>
+                      </td>
+                      <td><StatusBadge tone={attendanceTone[row.attendance_status]}>{row.attendance_status}</StatusBadge></td>
+                      <td className="whitespace-nowrap">
+                        {row.check_in_at ? (
+                          <>
+                            <div className="text-ink">{formatManilaDate(row.check_in_at)}</div>
+                            <div className="cell-meta uppercase">{row.check_in_method ?? '—'}</div>
+                          </>
+                        ) : <span className="text-subtle">—</span>}
+                      </td>
+                      <td className="max-w-56">
+                        <span className="block truncate text-muted" title={row.remarks ?? ''}>{row.remarks || '—'}</span>
+                      </td>
+                      <td>
+                        <div className="flex justify-end">
+                          {canEditRoster ? (
+                            <ActionMenu
+                              label={`Actions for ${row.full_name}`}
+                              items={[{ icon: Pencil, label: 'Edit attendance', onSelect: () => setEditing({ kind: 'student', row }) }]}
+                            />
+                          ) : <span className="text-meta text-subtle">Read only</span>}
+                        </div>
+                      </td>
+                    </tr>
+                  )
                 }
                 const row = item.row
-                return <tr key={item.key}>
-                  <td><span className="grid h-4 w-4 place-items-center rounded-full bg-violet-100 text-[0.55rem] font-bold text-violet-700" title="Temporary attendee">T</span></td>
-                  <td><div className="font-semibold text-slate-900 dark:text-slate-100">{row.full_name}</div><div className="mt-0.5 text-xs font-medium text-violet-700 dark:text-violet-300">Temporary attendee</div></td>
-                  <td className="font-mono text-xs font-semibold text-slate-700 dark:text-slate-300">{row.reference_number || '—'}</td>
-                  <td>{row.affiliation || '—'}</td>
-                  <td>—</td>
-                  <td><span className={`status-chip capitalize ${statusStyle(row.attendance_status)}`}>{row.attendance_status}</span></td>
-                  <td className="whitespace-nowrap">{formatManilaDate(row.recorded_at)}</td>
-                  <td><span className="text-xs font-semibold uppercase text-slate-500">Manual</span></td>
-                  <td><span className="block max-w-56 truncate text-sm text-slate-600 dark:text-slate-300" title={row.remarks ?? ''}>{row.remarks || '—'}</span></td>
-                  <td><div className="flex justify-end">{canEditRoster ? <button className="btn-secondary min-h-9 px-3 py-1.5" onClick={() => setEditing({ kind: 'guest', row })}><Pencil size={14} /> Edit</button> : <span className="text-xs text-slate-400">Read only</span>}</div></td>
-                </tr>
+                return (
+                  <tr key={item.key}>
+                    <td />
+                    <td>
+                      <div className="cell-title">{row.full_name}</div>
+                      <div className="cell-meta">
+                        {row.reference_number && <><span className="font-mono">{row.reference_number}</span><span className="px-1.5 text-line-strong">·</span></>}
+                        <span className="text-accent-ink">Temporary</span>
+                      </div>
+                    </td>
+                    <td><span className="text-muted">{row.affiliation || '—'}</span></td>
+                    <td><StatusBadge tone={attendanceTone[row.attendance_status]}>{row.attendance_status}</StatusBadge></td>
+                    <td className="whitespace-nowrap">
+                      <div className="text-ink">{formatManilaDate(row.recorded_at)}</div>
+                      <div className="cell-meta uppercase">Manual</div>
+                    </td>
+                    <td className="max-w-56">
+                      <span className="block truncate text-muted" title={row.remarks ?? ''}>{row.remarks || '—'}</span>
+                    </td>
+                    <td>
+                      <div className="flex justify-end">
+                        {canEditRoster ? (
+                          <ActionMenu
+                            label={`Actions for ${row.full_name}`}
+                            items={[{ icon: Pencil, label: 'Edit attendance', onSelect: () => setEditing({ kind: 'guest', row }) }]}
+                          />
+                        ) : <span className="text-meta text-subtle">Read only</span>}
+                      </div>
+                    </td>
+                  </tr>
+                )
               })}
-              {!pageRows.length && <tr><td colSpan={10}><EmptyState compact icon={SearchX} title="No roster entries found" description="Try changing the search or filters." /></td></tr>}
+              {!pageRows.length && (
+                <tr>
+                  <td colSpan={7}>
+                    <EmptyState compact icon={SearchX} title="No roster entries found" description="Try changing the search or filters." />
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
 
-        <footer className="roster-footer">
-          <span>Showing {filteredRows.length ? (safePage - 1) * PAGE_SIZE + 1 : 0}–{Math.min(safePage * PAGE_SIZE, filteredRows.length)} of {filteredRows.length.toLocaleString()} entries</span>
-          <div className="flex items-center gap-2"><button className="btn-secondary min-h-9 px-3 py-1.5" disabled={safePage === 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</button><span className="min-w-20 text-center font-medium">{safePage} / {pageCount}</span><button className="btn-secondary min-h-9 px-3 py-1.5" disabled={safePage === pageCount} onClick={() => setPage((current) => Math.min(pageCount, current + 1))}>Next</button></div>
-        </footer>
+        <div className="table-foot">
+          <span>{showingFrom}–{showingTo} of {filteredRows.length.toLocaleString()}</span>
+          <div className="flex items-center gap-2">
+            <button className="btn-secondary btn-sm" disabled={safePage === 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</button>
+            <span className="tabular-nums">Page {safePage} of {pageCount}</span>
+            <button className="btn-secondary btn-sm" disabled={safePage === pageCount} onClick={() => setPage((current) => Math.min(pageCount, current + 1))}>Next</button>
+          </div>
+        </div>
       </section>
 
       {addOpen && <AddRosterAttendeeModal eventRecord={eventRecord} existingStudentIds={existingStudentIds} onClose={() => setAddOpen(false)} onSaved={rosterSaved} />}

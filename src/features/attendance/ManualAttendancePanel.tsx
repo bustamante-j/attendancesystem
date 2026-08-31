@@ -1,4 +1,4 @@
-import { RotateCcw, Search, UserCheck } from 'lucide-react'
+import { RotateCcw, Search } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { friendlyError } from '../../lib/errors'
 import { processManualAttendance, searchEventStudents, undoLastManualAttendance, type AttendanceDirection } from '../../services/attendance'
@@ -84,64 +84,82 @@ export function ManualAttendancePanel({ eventId, direction, onResult }: {
   }
 
   return (
-    <section className="panel">
-      <div className="flex items-center gap-2">
-        <UserCheck size={19} />
+    <section className="table-shell">
+      <div className="surface-head">
         <div>
-          <h2 className="font-semibold">Manual attendance</h2>
-          <p className="text-xs text-slate-500">Search eligible students by name or student ID.</p>
+          <h2 className="section-title">Manual attendance</h2>
+          <p className="section-note">Search eligible students by name or student ID.</p>
         </div>
+        {lastAction && (
+          <button className="btn-secondary btn-sm" disabled={undoing} onClick={() => void undoLastAction()}>
+            <RotateCcw size={14} /> {undoing ? 'Undoing…' : `Undo ${lastAction.direction === 'check_in' ? 'check-in' : 'check-out'}`}
+          </button>
+        )}
       </div>
-      {lastAction && (
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/40">
-          <p className="text-sm text-amber-950 dark:text-amber-100">Last manual action: <strong>{lastAction.direction === 'check_in' ? 'check-in' : 'check-out'} for {lastAction.fullName}</strong></p>
-          <button className="btn-secondary" disabled={undoing} onClick={() => void undoLastAction()}><RotateCcw size={16} /> {undoing ? 'Undoing…' : 'Undo last action'}</button>
+
+      <div className="p-4">
+        {lastAction && (
+          <p className="mb-3 text-meta text-muted">
+            Last action: {lastAction.direction === 'check_in' ? 'check-in' : 'check-out'} for <span className="text-ink">{lastAction.fullName}</span>
+          </p>
+        )}
+
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-subtle" size={16} />
+          <input
+            aria-label="Search eligible students for manual attendance"
+            className="field pl-9"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Enter at least 2 characters"
+            autoComplete="off"
+          />
         </div>
-      )}
-      <div className="relative mt-4">
-        <Search className="pointer-events-none absolute left-3 top-2.5 text-slate-400" size={18} />
-        <input
-          aria-label="Search eligible students for manual attendance"
-          className="field pl-10"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Enter at least 2 characters"
-          autoComplete="off"
-        />
+
+        {error && <p className="mt-3 text-base text-bad-ink">{error}</p>}
+        {loading && <p className="mt-3 text-base text-muted">Searching…</p>}
+        {!loading && query.trim().length >= 2 && !students.length && !error && (
+          <p className="mt-3 text-base text-muted">No eligible students found.</p>
+        )}
+
+        {!!students.length && (
+          <ul className="mt-3 divide-y divide-line overflow-hidden rounded-xl border border-line">
+            {students.map((student) => {
+              const disabled = direction === 'check_in'
+                ? !!student.check_in_at
+                : !student.check_in_at || !!student.check_out_at
+              const status = student.check_out_at
+                ? 'Checked out'
+                : student.check_in_at
+                  ? student.check_in_status === 'late' ? 'Late' : 'Checked in'
+                  : 'Not checked in'
+              return (
+                <li className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between" key={student.student_id}>
+                  <div className="min-w-0">
+                    <div className="cell-title">{student.full_name}</div>
+                    <div className="cell-meta">
+                      <span className="font-mono">{student.student_number}</span>
+                      <span className="px-1.5 text-line-strong">·</span>
+                      {student.department_code}
+                      <span className="px-1.5 text-line-strong">·</span>
+                      Year {student.year_level}
+                      <span className="px-1.5 text-line-strong">·</span>
+                      {status}
+                    </div>
+                  </div>
+                  <button
+                    className="btn-secondary btn-sm shrink-0"
+                    disabled={disabled || processingId === student.student_id}
+                    onClick={() => void processStudent(student)}
+                  >
+                    {processingId === student.student_id ? 'Processing…' : direction === 'check_in' ? 'Check in' : 'Check out'}
+                  </button>
+                </li>
+              )
+            })}
+          </ul>
+        )}
       </div>
-      {error && <p className="mt-3 text-sm text-red-700">{error}</p>}
-      {loading && <p className="mt-3 text-sm text-slate-500">Searching…</p>}
-      {!loading && query.trim().length >= 2 && !students.length && !error && <p className="mt-3 text-sm text-slate-500">No eligible students found.</p>}
-      {!!students.length && (
-        <div className="mt-4 divide-y rounded-lg border border-slate-200">
-          {students.map((student) => {
-            const disabled = direction === 'check_in'
-              ? !!student.check_in_at
-              : !student.check_in_at || !!student.check_out_at
-            const status = student.check_out_at
-              ? 'Checked out'
-              : student.check_in_at
-                ? student.check_in_status === 'late' ? 'Late' : 'Checked in'
-                : 'Not checked in'
-            return (
-              <div className="flex flex-col gap-3 p-3 sm:flex-row sm:items-center sm:justify-between" key={student.student_id}>
-                <div className="min-w-0">
-                  <div className="font-medium">{student.full_name}</div>
-                  <div className="text-xs text-slate-500">{student.student_number} · {student.department_code} · Year {student.year_level}</div>
-                  <div className="mt-1 text-xs font-medium text-slate-600">{status}</div>
-                </div>
-                <button
-                  className="btn-secondary shrink-0"
-                  disabled={disabled || processingId === student.student_id}
-                  onClick={() => void processStudent(student)}
-                >
-                  {processingId === student.student_id ? 'Processing…' : direction === 'check_in' ? 'Check in' : 'Check out'}
-                </button>
-              </div>
-            )
-          })}
-        </div>
-      )}
     </section>
   )
 }

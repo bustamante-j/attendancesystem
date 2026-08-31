@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Alert } from '../../components/Alert'
 import { Modal } from '../../components/Modal'
 import { useConfirm } from '../../components/ConfirmDialog'
 import { friendlyError } from '../../lib/errors'
@@ -58,13 +59,15 @@ export function AttendanceEditModal({ eventRecord, row, onClose, onSaved }: {
   }
 
   return (
-    <Modal title={`Correct attendance · ${row.full_name}`} onClose={onClose} size="md" closeDisabled={busy}>
+    <Modal
+      title="Correct attendance"
+      description={`${row.full_name} · ${row.student_number} · ${row.department_code} Year ${row.year_level}`}
+      onClose={onClose}
+      size="sm"
+      closeDisabled={busy}
+    >
       <div className="space-y-4">
-        <div className="rounded-lg bg-slate-50 p-3 text-sm">
-          <div className="font-medium">{row.student_number}</div>
-          <div className="text-slate-500">{row.department_code} · Year {row.year_level}</div>
-        </div>
-        {error && <div className="rounded-md bg-red-50 p-3 text-sm text-red-800">{error}</div>}
+        {error && <Alert message={error} />}
         <label className="block">
           <span className="label">Check-in time (Asia/Manila)</span>
           <input className="field" type="datetime-local" value={checkInAt} onChange={(event) => setCheckInAt(event.target.value)} />
@@ -82,12 +85,16 @@ export function AttendanceEditModal({ eventRecord, row, onClose, onSaved }: {
             <input className="field" type="datetime-local" value={checkOutAt} onChange={(event) => setCheckOutAt(event.target.value)} />
           </label>
         )}
-        <p className="text-xs text-slate-500">Corrections are recorded as manual attendance and written to the audit log.</p>
-        <div className="flex flex-wrap justify-between gap-3 border-t pt-4">
-          <button className="btn-danger" disabled={busy || !row.check_in_at} onClick={() => void markAbsent()}>Mark absent</button>
-          <div className="flex gap-3">
+        <p className="text-meta text-muted">Corrections are recorded as manual attendance and written to the activity log.</p>
+        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-4">
+          <button className="btn-ghost text-bad-ink hover:bg-bad-soft" disabled={busy || !row.check_in_at} onClick={() => void markAbsent()}>
+            Mark absent
+          </button>
+          <div className="flex gap-2">
             <button className="btn-secondary" disabled={busy} onClick={onClose}>Cancel</button>
-            <button className="btn-primary" disabled={busy || !checkInAt} onClick={() => void save()}>{busy ? 'Saving…' : row.check_in_at ? 'Save correction' : 'Add attendance'}</button>
+            <button className="btn-primary" disabled={busy || !checkInAt} onClick={() => void save()}>
+              {busy ? 'Saving…' : row.check_in_at ? 'Save correction' : 'Add attendance'}
+            </button>
           </div>
         </div>
       </div>
