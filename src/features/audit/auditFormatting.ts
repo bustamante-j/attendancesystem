@@ -1,6 +1,7 @@
 import type { AuditLogRecord } from '../../services/auditLogs'
 
 const ACTION_LABELS: Record<string, string> = {
+  audit_logs_deleted: 'Deleted activity records',
   attendance_admin_removed: 'Removed an attendance record',
   attendance_admin_updated: 'Corrected an attendance record',
   attendance_manual_created: 'Added manual attendance',
@@ -16,14 +17,13 @@ const ACTION_LABELS: Record<string, string> = {
   event_deleted: 'Deleted an event',
   event_opened: 'Opened an event',
   event_pin_reset: 'Reset an event key',
-  event_pin_viewed: 'Viewed an event key',
   event_restored: 'Restored an event',
   event_updated: 'Updated an event',
+  historical_attendance_recorded: 'Recorded historical attendance',
   force_user_logout: 'Forced a user to sign out',
   password_reset: 'Reset a user password',
   qr_issued: 'Issued a student QR',
   qr_revoked: 'Revoked a student QR',
-  qr_viewed: 'Viewed a student QR',
   student_batch_imported: 'Imported students',
   student_created: 'Added a student',
   student_deleted: 'Deleted a student',

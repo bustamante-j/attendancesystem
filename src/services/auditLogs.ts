@@ -67,3 +67,9 @@ export async function listAllAuditLogs(filters: AuditLogFilters = {}) {
     if (batch.length < EXPORT_BATCH_SIZE) return rows
   }
 }
+
+export async function deleteAuditLogs(ids: string[]) {
+  const { data, error } = await supabase.rpc('delete_audit_logs', { p_ids: ids })
+  if (error) throw error
+  return Number(data)
+}

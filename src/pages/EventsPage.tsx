@@ -1,5 +1,5 @@
-import { CalendarX2, Copy, Eye, KeyRound, Pencil, Plus, ScanLine, Trash2, UserPlus } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { CalendarX2, Copy, Eye, History, KeyRound, Pencil, Plus, ScanLine, Trash2, UserPlus } from 'lucide-react'
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { Alert } from '../components/Alert'
 import { useConfirm } from '../components/ConfirmDialog'
@@ -19,6 +19,8 @@ import { formatManilaDate } from '../utils/dates'
 
 interface Audience { departmentIds: string[]; yearLevels: number[] }
 
+const HistoricalEventModal = lazy(() => import('../features/events/HistoricalEventModal').then((module) => ({ default: module.HistoricalEventModal })))
+
 export function EventsPage() {
   const confirm = useConfirm()
   const navigate = useNavigate()
@@ -28,6 +30,7 @@ export function EventsPage() {
   const canManage = profile?.role === 'super_admin' || profile?.role === 'admin' || profile?.role === 'faculty'
   const canAssign = profile?.role === 'super_admin' || profile?.role === 'admin'
   const canViewPin = profile?.role === 'super_admin'
+  const canCreateHistorical = profile?.role === 'super_admin' || profile?.role === 'admin'
   const [events, setEvents] = useState<EventRecord[]>([])
   const [departments, setDepartments] = useState<Department[]>([])
   const [profiles, setProfiles] = useState<Profile[]>([])
@@ -36,6 +39,7 @@ export function EventsPage() {
   const [formEvent, setFormEvent] = useState<EventRecord | null | undefined>(undefined)
   const [formAction, setFormAction] = useState<'create' | 'edit' | 'duplicate'>('create')
   const [formAudience, setFormAudience] = useState<Audience | null>(null)
+  const [historicalOpen, setHistoricalOpen] = useState(false)
   const [pinResult, setPinResult] = useState<{ event: string; pin: string } | null>(null)
   const [selectedEventId, setSelectedEventId] = useState('')
   const [selectedUserId, setSelectedUserId] = useState('')
@@ -158,13 +162,41 @@ export function EventsPage() {
 
   if (loading) return <LoadingScreen />
   return <div className="space-y-5">
-    <div className="page-header"><div><h1 className="page-title">{profile?.role === 'officer' ? 'Assigned Events' : 'Events'}</h1><p className="page-subtitle">Schedules and attendance windows use Asia/Manila.</p></div>{canManage && <button className="btn-primary" onClick={openCreate}><Plus size={17} /> Create event</button>}</div>
+    <div className="page-header"><div><h1 className="page-title">{profile?.role === 'officer' ? 'Assigned Events' : 'Events'}</h1><p className="page-subtitle">Schedules and attendance windows use Asia/Manila.</p></div>{canManage && <div className="flex flex-wrap gap-2">{canCreateHistorical && <button className="btn-secondary" onClick={() => setHistoricalOpen(true)}><History size={17} /> Add completed event</button>}<button className="btn-primary" onClick={openCreate}><Plus size={17} /> Create event</button></div>}</div>
     {message && <Alert message={message.text} tone={message.tone} />}
     <div className="toolbar"><SearchInput value={search} onChange={setSearch} placeholder="Search event or venue" /><select className="field max-w-40" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}><option value="all">All statuses</option><option value="draft">Draft</option><option value="open">Open</option><option value="closed">Closed</option></select></div>
     {!!events.length && <div className="panel"><h2 className="font-semibold">Event PIN access</h2><p className="mt-1 text-sm text-slate-500">Assigned staff enter the current PIN before processing attendance.</p><div className="mt-3 flex flex-wrap gap-3"><select className="field max-w-sm" value={selectedEventId} onChange={(event) => setSelectedEventId(event.target.value)}>{events.map((event) => <option key={event.id} value={event.id}>{event.name} ({event.status})</option>)}</select><input className="field max-w-40" inputMode="numeric" maxLength={6} placeholder="6-digit PIN" value={accessPin} onChange={(event) => setAccessPin(event.target.value.replace(/\D/g, ''))} /><button className="btn-secondary" disabled={accessPin.length !== 6} onClick={() => void grantAccess()}>Verify PIN</button></div></div>}
     {canAssign && !!events.length && <div className={`panel ${requestedAssignee ? 'ring-2 ring-blue-300' : ''}`}><div className="flex items-center gap-2"><UserPlus size={18} /><h2 className="font-semibold">Scanner assignments</h2></div><p className="mt-1 text-sm text-slate-500">Officers only see events they are assigned to. Choose both an event and staff account, then assign access.</p><div className="mt-3 flex flex-wrap gap-3"><select className="field max-w-sm" aria-label="Event for scanner assignment" value={selectedEventId} onChange={(event) => setSelectedEventId(event.target.value)}>{events.map((event) => <option key={event.id} value={event.id}>{event.name}</option>)}</select><select className="field max-w-sm" aria-label="Staff account to assign" value={selectedUserId} onChange={(event) => setSelectedUserId(event.target.value)}>{assignableProfiles.map((item) => <option key={item.id} value={item.id}>{item.full_name} ({item.role})</option>)}</select><button className="btn-primary" disabled={!selectedUserId || assignments.some((assignment) => assignment.user_id === selectedUserId)} onClick={() => void addAssignment()}>{assignments.some((assignment) => assignment.user_id === selectedUserId) ? 'Already assigned' : 'Assign scanner'}</button></div><div className="mt-4 flex flex-wrap gap-2">{assignments.map((assignment) => { const creator = assignment.user_id === selectedEvent?.created_by; return <span key={assignment.user_id} className="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-sm">{assignment.profiles?.full_name ?? assignment.user_id}{creator && <span className="text-xs text-slate-500">creator</span>}{!creator && <button className="text-red-700" onClick={() => void deleteAssignment(assignment)} aria-label="Remove assignment">×</button>}</span> })}{!assignments.length && <span className="text-sm text-slate-500">No staff assigned yet.</span>}</div></div>}
-    <div className="table-wrap"><table><thead><tr><th>Event</th><th>Audience</th><th>Schedule</th><th>Mode</th><th>Status</th><th>Attendance progress</th><th>Scanner</th>{canManage && <th>Actions</th>}</tr></thead><tbody>{visibleEvents.map((event) => { const audience = audiences[event.id]; const summary = progress[event.id]; const expected = summary?.expected ?? 0; const checkedIn = summary?.checkedIn ?? 0; const rate = expected ? Math.min(100, Math.round((checkedIn / expected) * 100)) : 0; return <tr key={event.id}><td><div className="font-medium">{event.name}</div><div className="text-xs text-slate-500">{event.venue || 'No venue'}</div></td><td><div className="flex flex-wrap gap-1">{audience?.departmentIds.map((id) => <span key={id} className="rounded bg-slate-100 px-2 py-1 text-xs">{departmentMap.get(id) ?? 'Unknown'}</span>)}</div><div className="mt-1 text-xs text-slate-500">{audience?.yearLevels.length ? `Years ${audience.yearLevels.join(', ')}` : 'All year levels'}</div></td><td>{formatManilaDate(event.start_at)}<div className="text-xs text-slate-500">to {formatManilaDate(event.end_at)}</div></td><td>{event.attendance_mode === 'check_in_out' ? 'Check-in/out' : 'Check-in only'}</td><td><span className={`status-chip capitalize ${event.status === 'open' ? 'bg-emerald-100 text-emerald-800' : event.status === 'closed' ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-800'}`}>{event.status}</span></td><td><div className="min-w-40"><div className="mb-1.5 flex items-center justify-between gap-3 text-xs"><span className="font-medium text-slate-700">{checkedIn.toLocaleString()} / {expected.toLocaleString()}</span><span className="font-semibold text-slate-500">{rate}%</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"><div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${rate}%` }} /></div></div></td><td><button className="btn-primary" disabled={event.status !== 'open'} onClick={() => navigate(`/events/${event.id}/scanner`)}><ScanLine size={15} /> Scan</button></td>{canManage && <td><div className="flex flex-wrap gap-2"><button className="btn-secondary" onClick={() => openEdit(event)}><Pencil size={14} /> Edit</button><button className="btn-secondary" onClick={() => openDuplicate(event)}><Copy size={14} /> Duplicate</button>{canViewPin && <button className="btn-secondary" onClick={() => void showPin(event)}><Eye size={14} /> View PIN</button>}<button className="btn-secondary" onClick={() => void resetPin(event)}><KeyRound size={14} /> Reset PIN</button>{event.status !== 'open' && <button className="btn-secondary" onClick={() => void changeStatus(event, 'open')}>Open</button>}{event.status !== 'closed' && <button className="btn-secondary" onClick={() => void changeStatus(event, 'closed')}>Close</button>}<button className="btn-danger" onClick={() => void remove(event)} aria-label={`Delete ${event.name}`}><Trash2 size={14} /></button></div></td>}</tr>})}{!visibleEvents.length && <tr><td colSpan={canManage ? 8 : 7}><EmptyState compact icon={CalendarX2} title={profile?.role === 'officer' && !events.length ? 'No assigned events' : 'No events found'} description={profile?.role === 'officer' && !events.length ? 'Ask a Super Admin to assign this account from the Events page.' : 'Try another search or status filter.'} /></td></tr>}</tbody></table></div>
+    <div className="table-wrap"><table><thead><tr><th>Event</th><th>Audience</th><th>Schedule</th><th>Mode</th><th>Status</th><th>Attendance progress</th><th>Scanner</th>{canManage && <th>Actions</th>}</tr></thead><tbody>
+      {visibleEvents.map((event) => {
+        const audience = audiences[event.id]
+        const summary = progress[event.id]
+        const expected = summary?.expected ?? 0
+        const checkedIn = summary?.checkedIn ?? 0
+        const rate = expected ? Math.min(100, Math.round((checkedIn / expected) * 100)) : 0
+        return <tr key={event.id}>
+          <td><div className="flex flex-wrap items-center gap-2"><span className="font-medium">{event.name}</span>{event.is_historical && <span className="status-chip bg-violet-100 text-violet-800 dark:bg-violet-950/60 dark:text-violet-200">Historical</span>}</div><div className="text-xs text-slate-500">{event.venue || 'No venue'}</div></td>
+          <td><div className="flex flex-wrap gap-1">{audience?.departmentIds.map((id) => <span key={id} className="rounded bg-slate-100 px-2 py-1 text-xs">{departmentMap.get(id) ?? 'Unknown'}</span>)}</div><div className="mt-1 text-xs text-slate-500">{audience?.yearLevels.length ? `Years ${audience.yearLevels.join(', ')}` : 'All year levels'}</div></td>
+          <td>{formatManilaDate(event.start_at)}<div className="text-xs text-slate-500">to {formatManilaDate(event.end_at)}</div></td>
+          <td>{event.attendance_mode === 'check_in_out' ? 'Check-in/out' : 'Check-in only'}</td>
+          <td><span className={`status-chip capitalize ${event.status === 'open' ? 'bg-emerald-100 text-emerald-800' : event.status === 'closed' ? 'bg-slate-200 text-slate-700' : 'bg-amber-100 text-amber-800'}`}>{event.status}</span></td>
+          <td><div className="min-w-40"><div className="mb-1.5 flex items-center justify-between gap-3 text-xs"><span className="font-medium text-slate-700">{checkedIn.toLocaleString()} / {expected.toLocaleString()}</span><span className="font-semibold text-slate-500">{rate}%</span></div><div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-800"><div className="h-full rounded-full bg-blue-600 transition-all" style={{ width: `${rate}%` }} /></div></div></td>
+          <td>{event.is_historical ? <span className="text-xs font-medium text-slate-500">Completed record</span> : <button className="btn-primary" disabled={event.status !== 'open'} onClick={() => navigate(`/events/${event.id}/scanner`)}><ScanLine size={15} /> Scan</button>}</td>
+          {canManage && <td><div className="flex flex-wrap gap-2">
+            <button className="btn-secondary" onClick={() => openEdit(event)}><Pencil size={14} /> Edit</button>
+            <button className="btn-secondary" onClick={() => openDuplicate(event)}><Copy size={14} /> Duplicate</button>
+            {canViewPin && !event.is_historical && <button className="btn-secondary" onClick={() => void showPin(event)}><Eye size={14} /> View PIN</button>}
+            {!event.is_historical && <button className="btn-secondary" onClick={() => void resetPin(event)}><KeyRound size={14} /> Reset PIN</button>}
+            {!event.is_historical && event.status !== 'open' && <button className="btn-secondary" onClick={() => void changeStatus(event, 'open')}>Open</button>}
+            {event.status !== 'closed' && <button className="btn-secondary" onClick={() => void changeStatus(event, 'closed')}>Close</button>}
+            <button className="btn-danger" onClick={() => void remove(event)} aria-label={`Delete ${event.name}`}><Trash2 size={14} /></button>
+          </div></td>}
+        </tr>
+      })}
+      {!visibleEvents.length && <tr><td colSpan={canManage ? 8 : 7}><EmptyState compact icon={CalendarX2} title={profile?.role === 'officer' && !events.length ? 'No assigned events' : 'No events found'} description={profile?.role === 'officer' && !events.length ? 'Ask a Super Admin to assign this account from the Events page.' : 'Try another search or status filter.'} /></td></tr>}
+    </tbody></table></div>
     {formEvent !== undefined && <EventFormModal event={formEvent} audience={formAudience} departments={departments} duplicate={formAction === 'duplicate'} onClose={() => { setFormEvent(undefined); setFormAudience(null) }} onSave={saveEvent} />}
+    {historicalOpen && <Suspense fallback={<LoadingScreen label="Opening completed event form…" />}><HistoricalEventModal departments={departments} onClose={() => setHistoricalOpen(false)} onCreated={async (text) => { setHistoricalOpen(false); setMessage({ text, tone: 'success' }); await load() }} /></Suspense>}
     {pinResult && <Modal title={`PIN for ${pinResult.event}`} onClose={() => setPinResult(null)} size="md"><div className="rounded-xl border border-amber-300 bg-amber-50 p-5 text-center dark:border-amber-700 dark:bg-amber-950/50"><p className="text-sm text-amber-900 dark:text-amber-100">Stored encrypted. Only a Super Admin can view this PIN again.</p><div className="my-5 font-mono text-4xl font-bold tracking-[0.35em]">{pinResult.pin}</div><button className="btn-primary" onClick={() => setPinResult(null)}>Done</button></div></Modal>}
   </div>
 }

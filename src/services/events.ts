@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase'
 import type { AttendanceMode, EventRecord, EventStatus } from '../types/app'
 import { invokeFunction } from './functions'
 
-const EVENT_COLUMNS = 'id,name,description,venue,start_at,end_at,check_in_opens_at,late_after,check_in_closes_at,attendance_mode,check_out_opens_at,check_out_closes_at,status,created_by,created_at,updated_at,deleted_at'
+const EVENT_COLUMNS = 'id,name,description,venue,start_at,end_at,check_in_opens_at,late_after,check_in_closes_at,attendance_mode,check_out_opens_at,check_out_closes_at,status,is_historical,created_by,created_at,updated_at,deleted_at'
 const QUERY_PAGE_SIZE = 500
 
 export interface EventInput {
@@ -44,6 +44,37 @@ export async function getEvent(eventId: string) {
 
 export async function createEvent(input: EventInput) {
   return invokeFunction<{ eventId: string; pin: string; warning: string }>('create-event', input as unknown as Record<string, unknown>)
+}
+
+export interface HistoricalAttendanceEntry {
+  student_id: string
+  status: 'present' | 'late'
+}
+
+export async function createHistoricalEvent(input: {
+  name: string
+  description: string
+  venue: string
+  start_at: string
+  end_at: string
+  attendance_mode: AttendanceMode
+  department_ids: string[]
+  year_levels: number[]
+  attendance: HistoricalAttendanceEntry[]
+}) {
+  const { data, error } = await supabase.rpc('create_historical_event', {
+    p_name: input.name,
+    p_description: input.description,
+    p_venue: input.venue,
+    p_start_at: input.start_at,
+    p_end_at: input.end_at,
+    p_attendance_mode: input.attendance_mode,
+    p_department_ids: input.department_ids,
+    p_year_levels: input.year_levels,
+    p_attendance: input.attendance,
+  })
+  if (error) throw error
+  return data as { eventId: string; attendanceCount: number; expectedCount: number }
 }
 
 export async function resetEventPin(eventId: string) {

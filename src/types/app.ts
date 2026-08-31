@@ -52,6 +52,7 @@ export interface EventRecord {
   check_out_opens_at: string | null
   check_out_closes_at: string | null
   status: EventStatus
+  is_historical: boolean
   created_by: string
   created_at: string
   updated_at: string

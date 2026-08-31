@@ -1,12 +1,13 @@
-import { ChevronLeft, ChevronRight, Download, FileSpreadsheet, RefreshCw, ScrollText } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Download, FileSpreadsheet, RefreshCw, ScrollText, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert } from '../components/Alert'
+import { useConfirm } from '../components/ConfirmDialog'
 import { EmptyState } from '../components/EmptyState'
 import { LoadingScreen } from '../components/LoadingScreen'
 import { auditActionLabel, auditActorName, auditActorRole, auditDetails, auditRecordLabel } from '../features/audit/auditFormatting'
 import { exportAuditLogsCsv, exportAuditLogsExcel } from '../features/audit/exportAuditLogs'
 import { friendlyError } from '../lib/errors'
-import { AUDIT_LOG_PAGE_SIZE, listAllAuditLogs, listAuditLogs, type AuditLogRecord } from '../services/auditLogs'
+import { AUDIT_LOG_PAGE_SIZE, deleteAuditLogs, listAllAuditLogs, listAuditLogs, type AuditLogRecord } from '../services/auditLogs'
 import { formatManilaDate } from '../utils/dates'
 
 const ENTITY_OPTIONS = [
@@ -17,16 +18,20 @@ const ENTITY_OPTIONS = [
   ['attendance', 'Attendance corrections'],
   ['department', 'Departments'],
   ['user', 'Users'],
+  ['audit_log', 'Activity log changes'],
 ] as const
 
 export function ActivityLogPage() {
+  const confirm = useConfirm()
   const [logs, setLogs] = useState<AuditLogRecord[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
   const [entityType, setEntityType] = useState('all')
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState<'csv' | 'xlsx' | null>(null)
-  const [message, setMessage] = useState<string | null>(null)
+  const [selected, setSelected] = useState<Set<string>>(() => new Set())
+  const [deleting, setDeleting] = useState(false)
+  const [message, setMessage] = useState<{ text: string; tone: 'error' | 'success' } | null>(null)
 
   const filters = useMemo(() => ({ entityType }), [entityType])
   const pageCount = Math.max(1, Math.ceil(total / AUDIT_LOG_PAGE_SIZE))
@@ -35,19 +40,50 @@ export function ActivityLogPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
-    setMessage(null)
     try {
       const result = await listAuditLogs(page, filters)
       setLogs(result.rows)
       setTotal(result.total)
     } catch (cause) {
-      setMessage(friendlyError(cause, 'Activity could not be loaded.'))
+      setMessage({ text: friendlyError(cause, 'Activity could not be loaded.'), tone: 'error' })
     } finally {
       setLoading(false)
     }
   }, [filters, page])
 
   useEffect(() => { void load() }, [load])
+  useEffect(() => { setSelected(new Set()) }, [entityType, page])
+
+  const allPageSelected = Boolean(logs.length) && logs.every((log) => selected.has(log.id))
+  const togglePage = () => setSelected(allPageSelected ? new Set() : new Set(logs.map((log) => log.id)))
+  const toggleLog = (id: string) => setSelected((current) => {
+    const next = new Set(current)
+    if (next.has(id)) next.delete(id)
+    else next.add(id)
+    return next
+  })
+
+  const removeSelected = async () => {
+    if (!selected.size || !await confirm({
+      title: `Delete ${selected.size} activity record${selected.size === 1 ? '' : 's'}?`,
+      message: 'The selected records will be permanently removed. This deletion will be retained as a new accountability entry.',
+      confirmLabel: 'Delete selected',
+      tone: 'danger',
+    })) return
+    setDeleting(true)
+    setMessage(null)
+    try {
+      const removed = await deleteAuditLogs([...selected])
+      setSelected(new Set())
+      if (removed >= logs.length && page > 1) setPage((value) => value - 1)
+      else await load()
+      setMessage({ text: `${removed} activity record${removed === 1 ? '' : 's'} deleted.`, tone: 'success' })
+    } catch (cause) {
+      setMessage({ text: friendlyError(cause, 'The selected activity could not be deleted.'), tone: 'error' })
+    } finally {
+      setDeleting(false)
+    }
+  }
 
   const runExport = async (type: 'csv' | 'xlsx') => {
     setExporting(type)
@@ -57,7 +93,7 @@ export function ActivityLogPage() {
       if (type === 'csv') exportAuditLogsCsv(rows)
       else await exportAuditLogsExcel(rows)
     } catch (cause) {
-      setMessage(friendlyError(cause, 'The activity export could not be created.'))
+      setMessage({ text: friendlyError(cause, 'The activity export could not be created.'), tone: 'error' })
     } finally {
       setExporting(null)
     }
@@ -75,7 +111,7 @@ export function ActivityLogPage() {
     </div>
 
     <Alert tone="info" message="Activity is visible only to the Super Admin and is automatically removed after 30 days. Exports include the current activity filter." />
-    {message && <Alert message={message} />}
+    {message && <Alert message={message.text} tone={message.tone} />}
 
     <div className="toolbar justify-between">
       <div className="flex flex-wrap items-center gap-3">
@@ -84,21 +120,22 @@ export function ActivityLogPage() {
           {ENTITY_OPTIONS.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select>
       </div>
-      <button className="btn-secondary" disabled={loading} onClick={() => void load()}><RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh</button>
+      <div className="flex flex-wrap items-center gap-2">{selected.size > 0 && <><span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{selected.size} selected</span><button className="btn-danger" disabled={deleting} onClick={() => void removeSelected()}><Trash2 size={16} /> {deleting ? 'Deleting…' : 'Delete selected'}</button></>}<button className="btn-secondary" disabled={loading} onClick={() => void load()}><RefreshCw size={16} className={loading ? 'animate-spin' : ''} /> Refresh</button></div>
     </div>
 
     <div className="table-wrap">
       <table>
-        <thead><tr><th>Date and time</th><th>User</th><th>Activity</th><th>Record</th><th>Details</th></tr></thead>
+        <thead><tr><th className="w-12"><input type="checkbox" checked={allPageSelected} onChange={togglePage} aria-label="Select all activity on this page" /></th><th>Date and time</th><th>User</th><th>Activity</th><th>Record</th><th>Details</th></tr></thead>
         <tbody>
           {logs.map((log) => <tr key={log.id}>
+            <td><input type="checkbox" checked={selected.has(log.id)} onChange={() => toggleLog(log.id)} aria-label={`Select ${auditActionLabel(log.action)} by ${auditActorName(log)}`} /></td>
             <td className="whitespace-nowrap text-xs text-slate-500 dark:text-slate-400">{formatManilaDate(log.created_at)}</td>
             <td><div className="font-medium text-slate-900 dark:text-white">{auditActorName(log)}</div><div className="text-xs text-slate-500">{auditActorRole(log)}</div></td>
             <td><div className="font-medium">{auditActionLabel(log.action)}</div><div className="text-xs capitalize text-slate-500">{log.entity_type.replace(/_/g, ' ')}</div></td>
             <td className="max-w-72 font-medium">{auditRecordLabel(log)}</td>
             <td className="max-w-96 text-xs leading-5 text-slate-500 dark:text-slate-400">{auditDetails(log)}</td>
           </tr>)}
-          {!logs.length && <tr><td colSpan={5}><EmptyState compact icon={ScrollText} title="No activity found" description="There is no retained activity for this filter yet." /></td></tr>}
+          {!logs.length && <tr><td colSpan={6}><EmptyState compact icon={ScrollText} title="No activity found" description="There is no retained activity for this filter yet." /></td></tr>}
         </tbody>
       </table>
     </div>
