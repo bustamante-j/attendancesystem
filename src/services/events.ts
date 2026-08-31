@@ -2,7 +2,7 @@ import { supabase } from '../lib/supabase'
 import type { AttendanceMode, EventRecord, EventStatus } from '../types/app'
 import { invokeFunction } from './functions'
 
-const EVENT_COLUMNS = 'id,name,description,venue,start_at,end_at,check_in_opens_at,late_after,check_in_closes_at,attendance_mode,check_out_opens_at,check_out_closes_at,status,is_historical,created_by,created_at,updated_at,deleted_at'
+const EVENT_COLUMNS = 'id,name,description,venue,start_at,end_at,check_in_opens_at,late_after,check_in_closes_at,attendance_mode,check_out_opens_at,check_out_closes_at,status,is_historical,attendance_finalized_at,attendance_finalized_by,created_by,created_at,updated_at,deleted_at'
 const QUERY_PAGE_SIZE = 500
 
 export interface EventInput {

@@ -7,6 +7,7 @@ import { ManualAttendancePanel } from '../features/attendance/ManualAttendancePa
 import { ScannerCamera } from '../features/attendance/ScannerCamera'
 import { playScanFeedback, primeScanFeedback, type ScanFeedbackTone } from '../features/attendance/feedback'
 import { useAuth } from '../features/auth/AuthProvider'
+import { EventWorkspaceNav } from '../features/events/EventWorkspaceNav'
 import { friendlyError } from '../lib/errors'
 import {
   getAttendanceSummary,
@@ -248,6 +249,8 @@ export function ScannerPage() {
         </div>
         <span className={`rounded-full px-3 py-1 text-sm font-medium capitalize ${eventRecord.status === 'open' ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}`}>{eventRecord.status}</span>
       </header>
+
+      <EventWorkspaceNav eventRecord={eventRecord} active="scanner" canViewReports={profile?.role !== 'officer'} />
 
       {error && <Alert message={error} />}
 

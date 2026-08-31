@@ -53,10 +53,45 @@ export interface EventRecord {
   check_out_closes_at: string | null
   status: EventStatus
   is_historical: boolean
+  attendance_finalized_at: string | null
+  attendance_finalized_by: string | null
   created_by: string
   created_at: string
   updated_at: string
   deleted_at: string | null
+}
+
+export interface EventRosterStudentRow {
+  attendance_id: string | null
+  student_id: string
+  student_number: string
+  full_name: string
+  sex: Sex
+  year_level: 1 | 2 | 3 | 4
+  department_id: string
+  department_name: string
+  department_code: string
+  is_expected: boolean
+  attendance_status: AttendanceReportStatus
+  check_in_at: string | null
+  check_in_method: 'qr' | 'manual' | null
+  check_out_at: string | null
+  check_out_method: 'qr' | 'manual' | null
+  remarks: string | null
+}
+
+export interface EventGuestAttendance {
+  id: string
+  event_id: string
+  full_name: string
+  reference_number: string | null
+  affiliation: string | null
+  attendance_status: Exclude<AttendanceReportStatus, 'absent'>
+  recorded_at: string
+  remarks: string | null
+  recorded_by: string
+  created_at: string
+  updated_at: string
 }
 
 export interface AttendanceResult {

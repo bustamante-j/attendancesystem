@@ -6,6 +6,8 @@ const ACTION_LABELS: Record<string, string> = {
   attendance_admin_updated: 'Corrected an attendance record',
   attendance_manual_created: 'Added manual attendance',
   attendance_manual_undone: 'Undid manual attendance',
+  attendance_roster_changed: 'Updated an event attendance roster',
+  attendance_roster_undone: 'Undid an event roster change',
   department_created: 'Added a department',
   department_deleted: 'Deleted a department',
   department_restored: 'Restored a department',
@@ -19,6 +21,9 @@ const ACTION_LABELS: Record<string, string> = {
   event_pin_reset: 'Reset an event key',
   event_restored: 'Restored an event',
   event_updated: 'Updated an event',
+  event_attendance_finalized: 'Finalized an attendance roster',
+  event_attendance_reopened: 'Reopened an attendance roster',
+  guest_attendee_changed: 'Updated a temporary attendee',
   historical_attendance_recorded: 'Recorded historical attendance',
   force_user_logout: 'Forced a user to sign out',
   password_reset: 'Reset a user password',
@@ -73,7 +78,7 @@ export function auditRecordLabel(log: AuditLogRecord) {
 
 export function auditDetails(log: AuditLogRecord) {
   const metadata = log.metadata ?? {}
-  const hidden = new Set(['student_number', 'name', 'code', 'username', 'student_id', 'user_id'])
+  const hidden = new Set(['student_number', 'name', 'code', 'username', 'student_id', 'user_id', 'changes', 'source_audit_id'])
   const values = Object.entries(metadata)
     .filter(([key]) => !hidden.has(key) && !SENSITIVE_KEY.test(key))
     .slice(0, 4)

@@ -10,6 +10,7 @@ const ActivityLogPage = lazy(() => import('../pages/ActivityLogPage').then((modu
 const DepartmentsPage = lazy(() => import('../pages/DepartmentsPage').then((module) => ({ default: module.DepartmentsPage })))
 const DevPage = lazy(() => import('../pages/DevPage').then((module) => ({ default: module.DevPage })))
 const EventsPage = lazy(() => import('../pages/EventsPage').then((module) => ({ default: module.EventsPage })))
+const EventAttendancePage = lazy(() => import('../pages/EventAttendancePage').then((module) => ({ default: module.EventAttendancePage })))
 const LoginPage = lazy(() => import('../pages/LoginPage').then((module) => ({ default: module.LoginPage })))
 const NotFoundPage = lazy(() => import('../pages/NotFoundPage').then((module) => ({ default: module.NotFoundPage })))
 const ReportsPage = lazy(() => import('../pages/ReportsPage').then((module) => ({ default: module.ReportsPage })))
@@ -32,6 +33,7 @@ export function App() {
           <Route path="students" element={<ProtectedRoute roles={['super_admin', 'admin', 'faculty']}><StudentsPage /></ProtectedRoute>} />
           <Route path="departments" element={<ProtectedRoute roles={['super_admin']}><DepartmentsPage /></ProtectedRoute>} />
           <Route path="events" element={<EventsPage />} />
+          <Route path="events/:eventId/attendance" element={<EventAttendancePage />} />
           <Route path="events/:eventId/scanner" element={<ScannerPage />} />
           <Route path="reports" element={<ProtectedRoute roles={['super_admin', 'admin', 'faculty']}><ReportsPage /></ProtectedRoute>} />
           <Route path="users" element={<ProtectedRoute roles={['super_admin', 'admin']}><UsersPage /></ProtectedRoute>} />
