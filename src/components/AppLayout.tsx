@@ -38,7 +38,6 @@ export function AppLayout() {
       ? [
           { to: '/', label: 'Dashboard', icon: LayoutDashboard },
           { to: '/students', label: 'Students', icon: Users },
-          { to: '/departments', label: 'Departments', icon: Building2 },
           { to: '/events', label: 'Events', icon: CalendarDays },
           { to: '/reports', label: 'Reports', icon: BarChart3 },
           { to: '/users', label: 'Users', icon: UserRoundCog },
