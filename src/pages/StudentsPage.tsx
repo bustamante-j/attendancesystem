@@ -1,4 +1,4 @@
-import { Eye, FileUp, KeyRound, Pencil, Plus, Printer, RotateCcw, SearchX, Trash2 } from 'lucide-react'
+import { Eye, FileUp, History, KeyRound, Pencil, Plus, Printer, RotateCcw, SearchX, Trash2 } from 'lucide-react'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Alert } from '../components/Alert'
 import { useConfirm } from '../components/ConfirmDialog'
@@ -6,6 +6,7 @@ import { EmptyState } from '../components/EmptyState'
 import { LoadingScreen } from '../components/LoadingScreen'
 import { SearchInput } from '../components/SearchInput'
 import { useAuth } from '../features/auth/AuthProvider'
+import { StudentHistoryModal, type StudentHistoryTarget } from '../features/reports/StudentHistoryModal'
 import { QrCredentialModal } from '../features/students/QrCredentialModal'
 import { StudentFormModal } from '../features/students/StudentFormModal'
 import { StudentImportModal } from '../features/students/StudentImportModal'
@@ -26,6 +27,7 @@ export function StudentsPage() {
   const [departments, setDepartments] = useState<Department[]>([])
   const [qrStatuses, setQrStatuses] = useState<Map<string, StudentQrStatus>>(new Map())
   const [editing, setEditing] = useState<Student | null | undefined>(undefined)
+  const [historyStudent, setHistoryStudent] = useState<StudentHistoryTarget | null>(null)
   const [showImport, setShowImport] = useState(false)
   const [qrModal, setQrModal] = useState<{ credentials: Array<{ studentId: string; credential: string }>; mode: 'issued' | 'viewed' } | null>(null)
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -162,7 +164,7 @@ export function StudentsPage() {
       {canManage && selected.size > 0 && <div className="flex flex-wrap items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3"><strong className="text-sm text-blue-900">{selected.size} selected</strong><button className="btn-primary" disabled={busy} onClick={() => void issueBatch()}><Printer size={16} /> Issue and print QR batch</button><button className="btn-secondary" onClick={() => setSelected(new Set())}>Clear selection</button></div>}
       <div className="table-wrap">
         <table>
-          <thead><tr>{canManage && <th><input type="checkbox" checked={allPageSelected} onChange={togglePage} aria-label="Select current page" /></th>}<th>Student ID</th><th>Full Name</th><th>Year</th><th>Sex</th><th>Department</th><th>Status</th>{canManage && <th>QR Credential</th>}{canManage && <th>Actions</th>}</tr></thead>
+          <thead><tr>{canManage && <th><input type="checkbox" checked={allPageSelected} onChange={togglePage} aria-label="Select current page" /></th>}<th>Student ID</th><th>Full Name</th><th>Year</th><th>Sex</th><th>Department</th><th>Status</th>{canManage && <th>QR Credential</th>}<th>Actions</th></tr></thead>
           <tbody>
             {pageRows.map((student) => {
               const qr = qrStatuses.get(student.id)
@@ -171,10 +173,10 @@ export function StudentsPage() {
                 <td className="font-mono">{student.student_number}</td><td className="font-medium">{student.full_name}</td><td>{student.year_level}</td><td>{student.sex}</td><td>{student.departments?.code ?? '—'}</td>
                 <td>{student.deleted_at ? <span className="rounded-full bg-red-100 px-2 py-1 text-xs text-red-800">Deleted</span> : <span className={`rounded-full px-2 py-1 text-xs ${student.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-700'}`}>{student.is_active ? 'Active' : 'Inactive'}</span>}</td>
                 {canManage && <td>{student.deleted_at ? '—' : qr?.has_active_credential ? <div><span className="text-sm text-emerald-700">Issued</span>{qr.issued_at && <div className="text-xs text-slate-500">{formatManilaDate(qr.issued_at)}</div>}</div> : <span className="text-sm text-slate-500">Not issued</span>}</td>}
-                {canManage && <td><div className="flex flex-wrap gap-2">{student.deleted_at ? <button className="btn-secondary" onClick={() => void restore(student)}><RotateCcw size={14} /> Restore</button> : <><button className="btn-secondary" onClick={() => setEditing(student)}><Pencil size={14} /> Edit</button><button className="btn-secondary" onClick={() => void toggleActive(student)}>{student.is_active ? 'Deactivate' : 'Activate'}</button>{canViewQr && qr?.has_active_credential && <button className="btn-primary" disabled={busy} onClick={() => void viewQr(student)}><Eye size={14} /> View QR</button>}<button className="btn-secondary" disabled={busy} onClick={() => void issueOne(student)}>{qr?.has_active_credential ? <RotateCcw size={14} /> : <KeyRound size={14} />}{qr?.has_active_credential ? 'Regenerate QR' : 'Issue QR'}</button><button className="btn-danger" onClick={() => void remove(student)} aria-label={`Delete ${student.full_name}`}><Trash2 size={14} /></button></>}</div></td>}
+                <td><div className="flex flex-wrap gap-2"><button className="btn-secondary" onClick={() => setHistoryStudent(student)}><History size={14} /> History</button>{canManage && (student.deleted_at ? <button className="btn-secondary" onClick={() => void restore(student)}><RotateCcw size={14} /> Restore</button> : <><button className="btn-secondary" onClick={() => setEditing(student)}><Pencil size={14} /> Edit</button><button className="btn-secondary" onClick={() => void toggleActive(student)}>{student.is_active ? 'Deactivate' : 'Activate'}</button>{canViewQr && qr?.has_active_credential && <button className="btn-primary" disabled={busy} onClick={() => void viewQr(student)}><Eye size={14} /> View QR</button>}<button className="btn-secondary" disabled={busy} onClick={() => void issueOne(student)}>{qr?.has_active_credential ? <RotateCcw size={14} /> : <KeyRound size={14} />}{qr?.has_active_credential ? 'Regenerate QR' : 'Issue QR'}</button><button className="btn-danger" onClick={() => void remove(student)} aria-label={`Delete ${student.full_name}`}><Trash2 size={14} /></button></>)}</div></td>
               </tr>
             })}
-            {!pageRows.length && <tr><td colSpan={canManage ? 10 : 6}><EmptyState compact icon={SearchX} title="No students found" description="Try changing the search or filters." /></td></tr>}
+            {!pageRows.length && <tr><td colSpan={canManage ? 9 : 7}><EmptyState compact icon={SearchX} title="No students found" description="Try changing the search or filters." /></td></tr>}
           </tbody>
         </table>
       </div>
@@ -182,6 +184,7 @@ export function StudentsPage() {
       {editing !== undefined && <StudentFormModal student={editing} departments={departments} error={message?.tone === 'error' ? message.text : null} onClose={() => setEditing(undefined)} onSave={save} />}
       {showImport && <StudentImportModal departments={departments} onClose={() => setShowImport(false)} onImported={load} />}
       {qrModal && <QrCredentialModal students={students} credentials={qrModal.credentials} mode={qrModal.mode} onClose={() => setQrModal(null)} />}
+      {historyStudent && <StudentHistoryModal student={historyStudent} onClose={() => setHistoryStudent(null)} />}
     </div>
   )
 }
