@@ -10,7 +10,8 @@ export default defineConfig({
       injectRegister: null,
       includeAssets: [
         'branding/attendly-logo.webp',
-        'branding/favicon.ico',
+        'branding/favicon-transparent.ico',
+        'branding/tab-icon-64x64.png',
         'branding/apple-touch-icon-180x180.png',
       ],
       manifest: {
@@ -28,7 +29,7 @@ export default defineConfig({
         categories: ['education', 'productivity', 'business'],
         icons: [
           {
-            src: '/branding/pwa-64x64.png',
+            src: '/branding/tab-icon-64x64.png',
             sizes: '64x64',
             type: 'image/png',
           },
