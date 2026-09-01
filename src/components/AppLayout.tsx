@@ -16,7 +16,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../features/auth/AuthProvider'
 import { usePwaInstall } from '../features/pwa/usePwaInstall'
-import { ThemeToggle } from '../features/theme/ThemeProvider'
+import { PaletteToggle, ThemeToggle } from '../features/theme/ThemeProvider'
 import { BrandLogo } from './BrandLogo'
 
 export function AppLayout() {
@@ -67,10 +67,10 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen md:flex">
-      <header className="fixed inset-x-0 top-0 z-30 flex h-14 items-center justify-between border-b border-line bg-surface/90 px-3 backdrop-blur md:hidden">
+      <header className="fixed inset-x-0 top-0 z-30 grid h-14 grid-cols-[1fr_auto_1fr] items-center border-b border-line bg-surface/90 px-3 backdrop-blur md:hidden">
         <button
           type="button"
-          className="icon-btn"
+          className="icon-btn justify-self-start"
           aria-label={open ? 'Close navigation' : 'Open navigation'}
           aria-expanded={open}
           onClick={() => setOpen(!open)}
@@ -81,7 +81,10 @@ export function AppLayout() {
           <BrandLogo markOnly className="h-7 w-7" />
           <span className="font-semibold tracking-tight text-ink">Attendly</span>
         </div>
-        <ThemeToggle />
+        <div className="flex items-center gap-1 justify-self-end">
+          <PaletteToggle />
+          <ThemeToggle />
+        </div>
       </header>
 
       {open && (
@@ -117,7 +120,7 @@ export function AppLayout() {
               end={to === '/'}
               className={({ isActive }) => `flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-base transition-colors ${
                 isActive
-                  ? 'bg-accent font-medium text-white'
+                  ? 'bg-accent font-medium text-accent-contrast'
                   : 'text-sidebar-muted hover:bg-white/[0.07] hover:text-sidebar-ink'
               }`}
             >
@@ -152,6 +155,7 @@ export function AppLayout() {
             >
               <LogOut size={16} /> Sign out
             </button>
+            <PaletteToggle className="inline-grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sidebar-muted transition-colors hover:bg-white/[0.07] hover:text-sidebar-ink" />
             <ThemeToggle className="inline-grid h-9 w-9 shrink-0 place-items-center rounded-lg text-sidebar-muted transition-colors hover:bg-white/[0.07] hover:text-sidebar-ink" />
           </div>
         </div>

@@ -102,7 +102,7 @@ export function ScannerCamera({ enabled, processing, onDecode, onError }: {
         </div>
       )}
       {processing && (
-        <div className="absolute inset-x-0 bottom-0 bg-accent px-4 py-2.5 text-center text-base font-medium text-white">
+        <div className="absolute inset-x-0 bottom-0 bg-accent px-4 py-2.5 text-center text-base font-medium text-accent-contrast">
           Processing scan…
         </div>
       )}

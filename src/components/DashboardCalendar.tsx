@@ -200,7 +200,7 @@ export function DashboardCalendar({ events }: { events: EventRecord[] }) {
                     >
                       <span
                         className={`grid h-6 w-6 place-items-center rounded-full text-meta tabular-nums ${
-                          today ? 'bg-accent font-semibold text-white'
+                          today ? 'bg-accent font-semibold text-accent-contrast'
                             : day.inMonth ? 'text-ink' : 'text-subtle'
                         }`}
                       >

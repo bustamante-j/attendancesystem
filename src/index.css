@@ -27,6 +27,7 @@
     --accent-hover: 29 78 216;
     --accent-soft: 239 244 255;
     --accent-ink: 29 78 216;
+    --accent-contrast: 255 255 255;
 
     --ok: 16 137 96;
     --ok-soft: 236 250 243;
@@ -65,6 +66,7 @@
     --accent-hover: 96 165 250;
     --accent-soft: 19 32 57;
     --accent-ink: 147 197 253;
+    --accent-contrast: 11 13 17;
 
     --ok: 52 189 138;
     --ok-soft: 8 40 31;
@@ -79,6 +81,50 @@
     --bad-ink: 252 165 165;
 
     color-scheme: dark;
+  }
+
+  :root[data-palette='forest'] {
+    --canvas: 248 250 249;
+    --surface: 255 255 255;
+    --sunken: 243 247 245;
+    --line: 222 230 226;
+    --line-strong: 201 213 207;
+
+    --ink: 18 28 24;
+    --muted: 82 99 91;
+    --subtle: 125 141 133;
+
+    --accent: 4 120 87;
+    --accent-hover: 6 95 70;
+    --accent-soft: 236 253 245;
+    --accent-ink: 4 120 87;
+    --accent-contrast: 255 255 255;
+
+    --sidebar: 9 30 25;
+    --sidebar-muted: 148 175 164;
+    --sidebar-line: 33 61 52;
+  }
+
+  :root.dark[data-palette='forest'] {
+    --canvas: 9 16 14;
+    --surface: 16 26 22;
+    --sunken: 12 21 18;
+    --line: 31 48 41;
+    --line-strong: 45 65 56;
+
+    --ink: 234 241 238;
+    --muted: 153 174 165;
+    --subtle: 109 134 123;
+
+    --accent: 52 211 153;
+    --accent-hover: 110 231 183;
+    --accent-soft: 10 47 36;
+    --accent-ink: 110 231 183;
+    --accent-contrast: 9 16 14;
+
+    --sidebar: 6 22 18;
+    --sidebar-muted: 143 174 162;
+    --sidebar-line: 27 58 48;
   }
 
   html {
@@ -183,7 +229,7 @@
   }
 
   .btn-primary {
-    @apply btn bg-accent text-white hover:bg-accent-hover;
+    @apply btn bg-accent text-accent-contrast hover:bg-accent-hover;
   }
 
   .btn-secondary {

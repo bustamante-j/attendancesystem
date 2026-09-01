@@ -7,7 +7,7 @@ import { z } from 'zod'
 import { Alert } from '../components/Alert'
 import { BrandLogo } from '../components/BrandLogo'
 import { useAuth } from '../features/auth/AuthProvider'
-import { ThemeToggle } from '../features/theme/ThemeProvider'
+import { PaletteToggle, ThemeToggle } from '../features/theme/ThemeProvider'
 import { friendlyError } from '../lib/errors'
 import { environmentError } from '../lib/supabase'
 
@@ -35,7 +35,10 @@ export function LoginPage() {
 
   return (
     <main className="grid min-h-screen bg-canvas lg:grid-cols-2">
-      <div className="absolute right-4 top-4 z-10"><ThemeToggle /></div>
+      <div className="absolute right-4 top-4 z-10 flex items-center gap-1.5">
+        <PaletteToggle />
+        <ThemeToggle />
+      </div>
 
       {/* Quiet brand panel: one statement, no gradients competing with the form. */}
       <section className="relative hidden flex-col justify-between border-r border-line bg-sunken p-12 lg:flex">

@@ -55,9 +55,13 @@ function buildTheme(): ChartTheme {
 }
 
 export function useChartTheme(): ChartTheme {
-  const { theme } = useTheme()
+  const { theme, palette: colorPalette } = useTheme()
   const [palette, setPalette] = useState<ChartTheme>(buildTheme)
-  // The class swap on <html> lands before this effect, so the read is current.
-  useEffect(() => { setPalette(buildTheme()) }, [theme])
+  // Read after the provider's DOM token update has committed so charts cannot
+  // retain the previous palette for one toggle cycle.
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => setPalette(buildTheme()))
+    return () => window.cancelAnimationFrame(frame)
+  }, [theme, colorPalette])
   return palette
 }

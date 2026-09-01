@@ -20,6 +20,7 @@ export default {
           hover: 'rgb(var(--accent-hover) / <alpha-value>)',
           soft: 'rgb(var(--accent-soft) / <alpha-value>)',
           ink: 'rgb(var(--accent-ink) / <alpha-value>)',
+          contrast: 'rgb(var(--accent-contrast) / <alpha-value>)',
         },
         ok: {
           DEFAULT: 'rgb(var(--ok) / <alpha-value>)',
