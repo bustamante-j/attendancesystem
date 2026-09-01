@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js'
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { supabase } from '../../lib/supabase'
 import type { Profile } from '../../types/app'
 import { usernameToInternalEmail } from '../../utils/auth'
@@ -33,6 +33,31 @@ function removeCachedProfile() {
   }
 }
 
+function readSessionStartedAt() {
+  try {
+    const value = Number(sessionStorage.getItem(SESSION_STARTED_KEY))
+    return Number.isFinite(value) && value > 0 ? value : null
+  } catch {
+    return null
+  }
+}
+
+function writeSessionStartedAt(value: number) {
+  try {
+    sessionStorage.setItem(SESSION_STARTED_KEY, String(value))
+  } catch {
+    // The authenticated user's last_sign_in_at remains the fallback hard-cap anchor.
+  }
+}
+
+function removeSessionStartedAt() {
+  try {
+    sessionStorage.removeItem(SESSION_STARTED_KEY)
+  } catch {
+    // Local auth state is still cleared below when storage is restricted.
+  }
+}
+
 interface AuthContextValue {
   session: Session | null
   profile: Profile | null
@@ -48,9 +73,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const profileRequestRef = useRef(0)
 
   const clearLocalSession = useCallback(async () => {
-    sessionStorage.removeItem(SESSION_STARTED_KEY)
+    profileRequestRef.current += 1
+    removeSessionStartedAt()
     removeCachedProfile()
     setSession(null)
     setProfile(null)
@@ -62,15 +89,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const loadProfile = useCallback(async (activeSession: Session | null) => {
+    const requestId = ++profileRequestRef.current
     setSession(activeSession)
     if (!activeSession) {
+      removeSessionStartedAt()
+      removeCachedProfile()
       setProfile(null)
       setLoading(false)
       return
     }
 
-    const startedAt = Number(sessionStorage.getItem(SESSION_STARTED_KEY))
-    if (!startedAt || Date.now() - startedAt > MAX_SESSION_MS) {
+    const signedInAt = activeSession.user.last_sign_in_at
+      ? new Date(activeSession.user.last_sign_in_at).getTime()
+      : Date.now()
+    const startedAt = readSessionStartedAt() ?? signedInAt
+    writeSessionStartedAt(startedAt)
+    if (!Number.isFinite(startedAt) || Date.now() - startedAt > MAX_SESSION_MS) {
       await clearLocalSession()
       setLoading(false)
       return
@@ -82,6 +116,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq('id', activeSession.user.id)
       .maybeSingle()
 
+    if (requestId !== profileRequestRef.current) return
     if (error) {
       // A timeout or connection loss must not be treated as a disabled/revoked account.
       // The database still authorizes every operation, and the next online check revalidates.
@@ -93,9 +128,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     const nextProfile = data as Profile | null
-    const signedInAt = activeSession.user.last_sign_in_at
-      ? new Date(activeSession.user.last_sign_in_at).getTime()
-      : startedAt
     const wasRevoked = nextProfile?.session_revoked_at
       ? new Date(nextProfile.session_revoked_at).getTime() >= signedInAt
       : false
@@ -114,18 +146,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     let mounted = true
     void supabase.auth.getSession().then(({ data }) => {
       if (!mounted) return
-      if (data.session && !sessionStorage.getItem(SESSION_STARTED_KEY)) {
+      if (data.session && !readSessionStartedAt()) {
         const signedIn = data.session.user.last_sign_in_at
           ? new Date(data.session.user.last_sign_in_at).getTime()
           : Date.now()
-        sessionStorage.setItem(SESSION_STARTED_KEY, String(signedIn))
+        writeSessionStartedAt(signedIn)
       }
       void loadProfile(data.session)
+    }).catch(() => {
+      if (mounted) setLoading(false)
     })
 
     const { data: listener } = supabase.auth.onAuthStateChange((event, nextSession) => {
-      if (event === 'SIGNED_IN' && !sessionStorage.getItem(SESSION_STARTED_KEY)) {
-        sessionStorage.setItem(SESSION_STARTED_KEY, String(Date.now()))
+      if (event === 'SIGNED_IN' && !readSessionStartedAt()) {
+        writeSessionStartedAt(Date.now())
       }
       void loadProfile(nextSession)
     })
@@ -161,7 +195,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       password,
     })
     if (error) throw new Error('Invalid username or password.')
-    sessionStorage.setItem(SESSION_STARTED_KEY, String(Date.now()))
+    writeSessionStartedAt(Date.now())
   }, [])
 
   const signOut = useCallback(async () => {

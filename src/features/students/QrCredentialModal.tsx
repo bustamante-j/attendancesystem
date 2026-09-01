@@ -3,10 +3,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { Alert } from '../../components/Alert'
 import { Modal } from '../../components/Modal'
 import type { Student } from '../../types/app'
-import { createQrCardDataUrl, downloadDataUrl } from './qr'
+import { createQrCardObjectUrl, downloadUrl } from './qr'
 
 interface IssuedCredential { studentId: string; credential: string }
-interface QrCard { student: Student; dataUrl: string }
+interface QrCard { student: Student; imageUrl: string }
+
+const RENDER_BATCH_SIZE = 4
 
 export function QrCredentialModal({ students, credentials, mode, onClose }: { students: Student[]; credentials: IssuedCredential[]; mode: 'issued' | 'viewed'; onClose: () => void }) {
   const [cards, setCards] = useState<QrCard[]>([])
@@ -16,28 +18,42 @@ export function QrCredentialModal({ students, credentials, mode, onClose }: { st
 
   useEffect(() => {
     let current = true
+    const ownedUrls: string[] = []
     setCards([])
     setError(null)
     const renderCards = async () => {
-      for (const item of credentials) {
-        const student = studentMap.get(item.studentId)
-        if (!student) throw new Error('A selected student is no longer available.')
-        const dataUrl = await createQrCardDataUrl(item.credential, {
-          fullName: student.full_name,
-          studentNumber: student.student_number,
-          sex: student.sex,
-          departmentCode: student.departments?.code,
-          yearLevel: student.year_level,
-        })
-        if (!current) return
-        setCards((rendered) => [...rendered, { student, dataUrl }])
+      for (let index = 0; index < credentials.length; index += RENDER_BATCH_SIZE) {
+        const settled = await Promise.allSettled(credentials.slice(index, index + RENDER_BATCH_SIZE).map(async (item) => {
+          const student = studentMap.get(item.studentId)
+          if (!student) throw new Error('A selected student is no longer available.')
+          const imageUrl = await createQrCardObjectUrl(item.credential, {
+            fullName: student.full_name,
+            studentNumber: student.student_number,
+            sex: student.sex,
+            departmentCode: student.departments?.code,
+            yearLevel: student.year_level,
+          })
+          return { student, imageUrl }
+        }))
+        const batch = settled.flatMap((result) => result.status === 'fulfilled' ? [result.value] : [])
+        const failure = settled.find((result) => result.status === 'rejected')
+        if (!current || failure) {
+          batch.forEach((card) => URL.revokeObjectURL(card.imageUrl))
+          if (failure?.status === 'rejected') throw failure.reason
+          return
+        }
+        ownedUrls.push(...batch.map((card) => card.imageUrl))
+        setCards((rendered) => [...rendered, ...batch])
         await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()))
       }
     }
     void renderCards().catch((cause: unknown) => {
       if (current) setError(cause instanceof Error ? cause.message : 'QR images could not be rendered.')
     })
-    return () => { current = false }
+    return () => {
+      current = false
+      ownedUrls.forEach((url) => URL.revokeObjectURL(url))
+    }
   }, [credentials, studentMap])
 
   return (
@@ -68,12 +84,12 @@ export function QrCredentialModal({ students, credentials, mode, onClose }: { st
             <article className="qr-print-card break-inside-avoid rounded-xl border border-line bg-white p-3 text-center" key={card.student.id}>
               <img
                 className="mx-auto w-full max-w-sm"
-                src={card.dataUrl}
+                src={card.imageUrl}
                 alt={`Attendly QR card for ${card.student.full_name}, ${card.student.student_number}, ${card.student.sex}`}
               />
               <button
                 className="btn-secondary no-print mt-3"
-                onClick={() => downloadDataUrl(card.dataUrl, `Attendly-QR-${card.student.student_number}.png`)}
+                onClick={() => downloadUrl(card.imageUrl, `Attendly-QR-${card.student.student_number}.png`)}
               >
                 <Download size={15} /> Download PNG
               </button>

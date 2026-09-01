@@ -10,8 +10,8 @@ import { ViewModeToggle, type ViewMode } from '../components/ViewModeToggle'
 import { useAuth } from '../features/auth/AuthProvider'
 import { friendlyError } from '../lib/errors'
 import { supabase } from '../lib/supabase'
-import { getAttendanceSummary, subscribeToAttendance } from '../services/attendance'
-import { listEvents } from '../services/events'
+import { subscribeToAttendance } from '../services/attendance'
+import { getEventOverviews, listEvents } from '../services/events'
 import type { AttendanceSummary, EventRecord, EventStatus } from '../types/app'
 import { formatManilaDate } from '../utils/dates'
 
@@ -49,7 +49,12 @@ export function DashboardPage() {
       const failed = queries.find((query) => query.error)
       if (failed?.error) throw failed.error
       const recent = eventRows.slice(0, 5)
-      const summaries = await Promise.all(recent.map(async (event) => ({ event, summary: await getAttendanceSummary(event.id) })))
+      const overviews = await getEventOverviews(recent.map((event) => event.id))
+      const overviewMap = new Map(overviews.map((overview) => [overview.eventId, overview.summary]))
+      const summaries = recent.flatMap((event) => {
+        const summary = overviewMap.get(event.id)
+        return summary ? [{ event, summary }] : []
+      })
       setCounts({ students: queries[0].count ?? 0, departments: queries[1].count ?? 0, events: queries[2].count ?? 0, users: queries[3].count ?? 0 })
       setEvents(eventRows)
       setSnapshots(summaries)

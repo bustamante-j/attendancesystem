@@ -1,11 +1,21 @@
-export async function createQrDataUrl(credential: string, width = 512) {
-  const QRCode = await import('qrcode')
-  return QRCode.toDataURL(credential, {
+let qrModulePromise: Promise<typeof import('qrcode')> | null = null
+let brandImagePromise: Promise<HTMLImageElement | null> | null = null
+
+function qrModule() {
+  qrModulePromise ??= import('qrcode')
+  return qrModulePromise
+}
+
+async function createQrCanvas(credential: string, width = 512) {
+  const canvas = document.createElement('canvas')
+  const QRCode = await qrModule()
+  await QRCode.toCanvas(canvas, credential, {
     errorCorrectionLevel: 'M',
     margin: 2,
     width,
     color: { dark: '#0f172a', light: '#ffffff' },
   })
+  return canvas
 }
 
 export interface QrCardDetails {
@@ -25,6 +35,20 @@ function loadImage(source: string) {
   })
 }
 
+function loadBrandImage() {
+  brandImagePromise ??= loadImage('/branding/attendly-logo.webp').catch(() => null)
+  return brandImagePromise
+}
+
+function canvasPngBlob(canvas: HTMLCanvasElement) {
+  return new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob((blob) => {
+      if (blob) resolve(blob)
+      else reject(new Error('The QR image could not be encoded.'))
+    }, 'image/png')
+  })
+}
+
 function drawCenteredText(context: CanvasRenderingContext2D, text: string, y: number, maxWidth: number, startingSize: number, weight = 700) {
   let size = startingSize
   do {
@@ -34,7 +58,7 @@ function drawCenteredText(context: CanvasRenderingContext2D, text: string, y: nu
   context.fillText(text, 450, y, maxWidth)
 }
 
-export async function createQrCardDataUrl(credential: string, details: QrCardDetails) {
+export async function createQrCardObjectUrl(credential: string, details: QrCardDetails) {
   const canvas = document.createElement('canvas')
   canvas.width = 900
   canvas.height = 1200
@@ -49,7 +73,7 @@ export async function createQrCardDataUrl(credential: string, details: QrCardDet
 
   context.textAlign = 'center'
   context.textBaseline = 'middle'
-  const brandImage = await loadImage('/branding/attendly-logo.webp').catch(() => null)
+  const brandImage = await loadBrandImage()
   if (brandImage) context.drawImage(brandImage, 300, 34, 300, 100)
   else {
     context.fillStyle = '#0f172a'
@@ -60,7 +84,7 @@ export async function createQrCardDataUrl(credential: string, details: QrCardDet
   context.font = '600 22px Arial, sans-serif'
   context.fillText('SECURE ATTENDANCE CREDENTIAL', 450, 148)
 
-  const qrImage = await loadImage(await createQrDataUrl(credential, 660))
+  const qrImage = await createQrCanvas(credential, 660)
   context.drawImage(qrImage, 120, 176, 660, 660)
 
   context.fillStyle = '#0f172a'
@@ -83,12 +107,12 @@ export async function createQrCardDataUrl(credential: string, details: QrCardDet
   context.font = '400 20px Arial, sans-serif'
   context.fillText('Present this credential at authorized events. Do not share it.', 450, 1128, 790)
 
-  return canvas.toDataURL('image/png')
+  return URL.createObjectURL(await canvasPngBlob(canvas))
 }
 
-export function downloadDataUrl(dataUrl: string, fileName: string) {
+export function downloadUrl(url: string, fileName: string) {
   const anchor = document.createElement('a')
-  anchor.href = dataUrl
+  anchor.href = url
   anchor.download = fileName.replace(/[^a-z0-9_.-]+/gi, '_')
   anchor.click()
 }

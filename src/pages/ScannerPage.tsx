@@ -85,13 +85,24 @@ export function ScannerPage() {
   const processingRef = useRef(false)
   const lastCredentialRef = useRef<{ value: string; scannedAt: number } | null>(null)
   const summaryRefreshInFlightRef = useRef(false)
+  const summaryRefreshQueuedRef = useRef(false)
 
   const refreshSummary = useCallback(async () => {
-    if (!eventId || summaryRefreshInFlightRef.current) return
+    if (!eventId) return
+    if (summaryRefreshInFlightRef.current) {
+      summaryRefreshQueuedRef.current = true
+      return
+    }
     summaryRefreshInFlightRef.current = true
-    try { setSummary(await getAttendanceSummary(eventId)) }
-    catch (cause) { setError(friendlyError(cause, 'Live attendance counts could not be refreshed.')) }
-    finally { summaryRefreshInFlightRef.current = false }
+    try {
+      do {
+        summaryRefreshQueuedRef.current = false
+        try { setSummary(await getAttendanceSummary(eventId)) }
+        catch (cause) { setError(friendlyError(cause, 'Live attendance counts could not be refreshed.')) }
+      } while (summaryRefreshQueuedRef.current && !document.hidden)
+    } finally {
+      summaryRefreshInFlightRef.current = false
+    }
   }, [eventId])
 
   useEffect(() => {
@@ -167,7 +178,7 @@ export function ScannerPage() {
       setHasAccess(false)
       setCameraActive(false)
     }
-    await refreshSummary()
+    void refreshSummary()
   }, [refreshSummary])
 
   const processCredential = useCallback((rawCredential: string) => {
@@ -259,7 +270,12 @@ export function ScannerPage() {
         </div>
       </header>
 
-      <EventWorkspaceNav eventRecord={eventRecord} active="scanner" canViewReports={profile?.role !== 'officer'} />
+      <EventWorkspaceNav
+        eventRecord={eventRecord}
+        active="scanner"
+        canViewReports={profile?.role !== 'officer'}
+        canViewRoster={profile?.role !== 'officer'}
+      />
 
       {error && <Alert message={error} />}
 

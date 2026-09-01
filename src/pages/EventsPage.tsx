@@ -13,9 +13,9 @@ import { EventPinRevealModal, EventPinVerifyModal } from '../features/events/Eve
 import { EventFormModal } from '../features/events/EventFormModal'
 import { useAuth } from '../features/auth/AuthProvider'
 import { friendlyError } from '../lib/errors'
-import { getAttendanceSummary, subscribeToAttendance } from '../services/attendance'
+import { subscribeToAttendance } from '../services/attendance'
 import { listDepartments } from '../services/departments'
-import { createEvent, getEventAudience, listEvents, resetEventPin, setEventStatus, softDeleteEvent, updateEvent, viewEventPin, type EventInput } from '../services/events'
+import { createEvent, getEventOverviews, listEvents, resetEventPin, setEventStatus, softDeleteEvent, updateEvent, viewEventPin, type EventInput } from '../services/events'
 import { listProfiles } from '../services/users'
 import type { AttendanceSummary, Department, EventRecord, EventStatus, Profile } from '../types/app'
 import { formatManilaDate } from '../utils/dates'
@@ -54,24 +54,28 @@ export function EventsPage() {
   const [message, setMessage] = useState<{ text: string; tone: 'error' | 'success' | 'info' } | null>(null)
 
   const refreshProgress = useCallback(async (eventRows: EventRecord[]) => {
-    const summaries = await Promise.all(eventRows.map(async (event) => {
-      try { return [event.id, await getAttendanceSummary(event.id)] as const }
-      catch { return null }
-    }))
-    const updates = Object.fromEntries(summaries.filter((item): item is readonly [string, AttendanceSummary] => item !== null))
-    if (Object.keys(updates).length) setProgress((current) => ({ ...current, ...updates }))
+    if (!eventRows.length) return
+    try {
+      const overviews = await getEventOverviews(eventRows.map((event) => event.id))
+      setProgress((current) => ({
+        ...current,
+        ...Object.fromEntries(overviews.map((overview) => [overview.eventId, overview.summary])),
+      }))
+    } catch {
+      // The next realtime event or full page reload will retry the live totals.
+    }
   }, [])
 
   const load = useCallback(async () => {
     try {
       const [eventRows, departmentRows, profileRows] = await Promise.all([listEvents(), listDepartments(), canAssign ? listProfiles() : Promise.resolve([])])
       setEvents(eventRows); setDepartments(departmentRows); setProfiles(profileRows)
-      const metadata = await Promise.all(eventRows.map(async (event) => {
-        const [summary, audience] = await Promise.all([getAttendanceSummary(event.id).catch(() => null), getEventAudience(event.id).catch(() => ({ departmentIds: [], yearLevels: [] }))])
-        return { id: event.id, summary, audience }
-      }))
-      setProgress(Object.fromEntries(metadata.filter((item) => item.summary).map((item) => [item.id, item.summary as AttendanceSummary])))
-      setAudiences(Object.fromEntries(metadata.map((item) => [item.id, item.audience])))
+      const overviews = await getEventOverviews(eventRows.map((event) => event.id))
+      setProgress(Object.fromEntries(overviews.map((overview) => [overview.eventId, overview.summary])))
+      setAudiences(Object.fromEntries(overviews.map((overview) => [overview.eventId, {
+        departmentIds: overview.departmentIds,
+        yearLevels: overview.yearLevels,
+      }])))
     } catch (cause) { setMessage({ text: friendlyError(cause), tone: 'error' }) }
     finally { setLoading(false) }
   }, [canAssign])
@@ -217,9 +221,11 @@ export function EventsPage() {
                     <td><StatusBadge tone={statusTone[event.status]}>{event.status}</StatusBadge></td>
                     <td>
                       <div className="flex items-center justify-end gap-1.5">
-                        <Link className="btn-secondary btn-sm" to={`/events/${event.id}/attendance`}>
-                          <ClipboardList size={14} /> Roster
-                        </Link>
+                        {profile?.role !== 'officer' && (
+                          <Link className="btn-secondary btn-sm" to={`/events/${event.id}/attendance`}>
+                            <ClipboardList size={14} /> Roster
+                          </Link>
+                        )}
                         {!event.is_historical && event.status === 'open' && (
                           <button className="btn-primary btn-sm" onClick={() => navigate(`/events/${event.id}/scanner`)}>
                             <ScanLine size={14} /> Scan
@@ -294,6 +300,7 @@ export function EventsPage() {
           eventRecord={assignmentsEvent}
           profiles={profiles}
           actorId={profile.id}
+          initialUserId={requestedAssignee}
           onClose={() => setAssignmentsEvent(null)}
         />
       )}

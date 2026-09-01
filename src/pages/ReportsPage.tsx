@@ -193,7 +193,8 @@ export function ReportsPage() {
     return true
   }), [department, method, rows, search, status, year])
   const pageCount = Math.max(1, Math.ceil(filteredRows.length / PAGE_SIZE))
-  const pageRows = filteredRows.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
+  const safePage = Math.min(page, pageCount)
+  const pageRows = filteredRows.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE)
 
   const summary = useMemo(() => {
     const expectedRows = rows.filter((row) => row.is_expected)
@@ -433,9 +434,9 @@ export function ReportsPage() {
                     <div className="table-foot">
                       <span>{filteredRows.length.toLocaleString()} {filteredRows.length === 1 ? 'result' : 'results'}</span>
                       <div className="flex items-center gap-2">
-                        <button className="btn-secondary btn-sm" disabled={page === 1} onClick={() => setPage((current) => current - 1)}>Previous</button>
-                        <span className="tabular-nums">Page {page} of {pageCount}</span>
-                        <button className="btn-secondary btn-sm" disabled={page === pageCount} onClick={() => setPage((current) => current + 1)}>Next</button>
+                        <button className="btn-secondary btn-sm" disabled={safePage === 1} onClick={() => setPage((current) => Math.max(1, current - 1))}>Previous</button>
+                        <span className="tabular-nums">Page {safePage} of {pageCount}</span>
+                        <button className="btn-secondary btn-sm" disabled={safePage === pageCount} onClick={() => setPage((current) => Math.min(pageCount, current + 1))}>Next</button>
                       </div>
                     </div>
                   </div>

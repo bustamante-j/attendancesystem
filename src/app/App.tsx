@@ -33,7 +33,7 @@ export function App() {
           <Route path="students" element={<ProtectedRoute roles={['super_admin', 'admin', 'faculty']}><StudentsPage /></ProtectedRoute>} />
           <Route path="departments" element={<ProtectedRoute roles={['super_admin']}><DepartmentsPage /></ProtectedRoute>} />
           <Route path="events" element={<EventsPage />} />
-          <Route path="events/:eventId/attendance" element={<EventAttendancePage />} />
+          <Route path="events/:eventId/attendance" element={<ProtectedRoute roles={['super_admin', 'admin', 'faculty']}><EventAttendancePage /></ProtectedRoute>} />
           <Route path="events/:eventId/scanner" element={<ScannerPage />} />
           <Route path="reports" element={<ProtectedRoute roles={['super_admin', 'admin', 'faculty']}><ReportsPage /></ProtectedRoute>} />
           <Route path="users" element={<ProtectedRoute roles={['super_admin', 'admin']}><UsersPage /></ProtectedRoute>} />

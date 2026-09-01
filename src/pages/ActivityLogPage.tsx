@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, Download, FileSpreadsheet, RefreshCw, ScrollText, Trash2 } from 'lucide-react'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Alert } from '../components/Alert'
 import { useConfirm } from '../components/ConfirmDialog'
 import { EmptyState } from '../components/EmptyState'
@@ -32,6 +32,7 @@ export function ActivityLogPage() {
   const [selected, setSelected] = useState<Set<string>>(() => new Set())
   const [deleting, setDeleting] = useState(false)
   const [message, setMessage] = useState<{ text: string; tone: 'error' | 'success' } | null>(null)
+  const requestRef = useRef(0)
 
   const filters = useMemo(() => ({ entityType }), [entityType])
   const pageCount = Math.max(1, Math.ceil(total / AUDIT_LOG_PAGE_SIZE))
@@ -39,20 +40,23 @@ export function ActivityLogPage() {
   const to = Math.min(page * AUDIT_LOG_PAGE_SIZE, total)
 
   const load = useCallback(async () => {
+    const requestId = ++requestRef.current
     setLoading(true)
     try {
       const result = await listAuditLogs(page, filters)
+      if (requestId !== requestRef.current) return
       setLogs(result.rows)
       setTotal(result.total)
     } catch (cause) {
-      setMessage({ text: friendlyError(cause, 'Activity could not be loaded.'), tone: 'error' })
+      if (requestId === requestRef.current) setMessage({ text: friendlyError(cause, 'Activity could not be loaded.'), tone: 'error' })
     } finally {
-      setLoading(false)
+      if (requestId === requestRef.current) setLoading(false)
     }
   }, [filters, page])
 
   useEffect(() => { void load() }, [load])
   useEffect(() => { setSelected(new Set()) }, [entityType, page])
+  useEffect(() => { if (page > pageCount) setPage(pageCount) }, [page, pageCount])
 
   const allPageSelected = Boolean(logs.length) && logs.every((log) => selected.has(log.id))
   const togglePage = () => setSelected(allPageSelected ? new Set() : new Set(logs.map((log) => log.id)))

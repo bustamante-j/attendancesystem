@@ -11,10 +11,11 @@ import type { EventRecord, Profile } from '../../types/app'
  * Assignments are per-event, so they belong in the context of one event rather
  * than in a permanently mounted panel with its own event picker.
  */
-export function EventAssignmentsModal({ eventRecord, profiles, actorId, onClose }: {
+export function EventAssignmentsModal({ eventRecord, profiles, actorId, initialUserId, onClose }: {
   eventRecord: EventRecord
   profiles: Profile[]
   actorId: string
+  initialUserId?: string | null
   onClose: () => void
 }) {
   const [assignments, setAssignments] = useState<EventAssignment[]>([])
@@ -40,9 +41,10 @@ export function EventAssignmentsModal({ eventRecord, profiles, actorId, onClose 
   useEffect(() => {
     setSelectedUserId((current) => {
       if (current && assignable.some((item) => item.id === current)) return current
+      if (initialUserId && assignable.some((item) => item.id === initialUserId)) return initialUserId
       return assignable.find((item) => !assignments.some((assignment) => assignment.user_id === item.id))?.id ?? ''
     })
-  }, [assignable, assignments])
+  }, [assignable, assignments, initialUserId])
 
   const alreadyAssigned = assignments.some((assignment) => assignment.user_id === selectedUserId)
 

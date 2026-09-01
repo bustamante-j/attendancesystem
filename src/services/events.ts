@@ -1,5 +1,5 @@
 import { supabase } from '../lib/supabase'
-import type { AttendanceMode, EventRecord, EventStatus } from '../types/app'
+import type { AttendanceMode, AttendanceSummary, EventRecord, EventStatus } from '../types/app'
 import { invokeFunction } from './functions'
 
 const EVENT_COLUMNS = 'id,name,description,venue,start_at,end_at,check_in_opens_at,late_after,check_in_closes_at,attendance_mode,check_out_opens_at,check_out_closes_at,status,is_historical,attendance_finalized_at,attendance_finalized_by,created_by,created_at,updated_at,deleted_at'
@@ -22,13 +22,19 @@ export interface EventInput {
 }
 
 export async function listEvents() {
-  const { data, error } = await supabase
-    .from('events')
-    .select(EVENT_COLUMNS)
-    .is('deleted_at', null)
-    .order('start_at', { ascending: false })
-  if (error) throw error
-  return data as EventRecord[]
+  const rows: EventRecord[] = []
+  for (let from = 0; ; from += QUERY_PAGE_SIZE) {
+    const { data, error } = await supabase
+      .from('events')
+      .select(EVENT_COLUMNS)
+      .is('deleted_at', null)
+      .order('start_at', { ascending: false })
+      .order('id', { ascending: false })
+      .range(from, from + QUERY_PAGE_SIZE - 1)
+    if (error) throw error
+    rows.push(...(data as EventRecord[]))
+    if (data.length < QUERY_PAGE_SIZE) return rows
+  }
 }
 
 export async function getEvent(eventId: string) {
@@ -85,17 +91,48 @@ export async function viewEventPin(eventId: string) {
   return invokeFunction<{ pin: string }>('view-event-pin', { event_id: eventId })
 }
 
-export async function getEventAudience(eventId: string) {
-  const [departments, years] = await Promise.all([
-    supabase.from('event_departments').select('department_id').eq('event_id', eventId),
-    supabase.from('event_year_levels').select('year_level').eq('event_id', eventId),
-  ])
-  if (departments.error) throw departments.error
-  if (years.error) throw years.error
-  return {
-    departmentIds: departments.data.map((row) => row.department_id as string),
-    yearLevels: years.data.map((row) => row.year_level as number),
+interface EventOverviewRow {
+  event_id: string
+  department_ids: string[]
+  year_levels: number[]
+  expected: number
+  checked_in: number
+  remaining: number
+  present: number
+  late: number
+  checked_out: number
+}
+
+export interface EventOverview {
+  eventId: string
+  departmentIds: string[]
+  yearLevels: number[]
+  summary: AttendanceSummary
+}
+
+export async function getEventOverviews(eventIds: string[]) {
+  if (!eventIds.length) return []
+  const rows: EventOverview[] = []
+  for (let index = 0; index < eventIds.length; index += QUERY_PAGE_SIZE) {
+    const { data, error } = await supabase.rpc('get_event_overviews', {
+      p_event_ids: eventIds.slice(index, index + QUERY_PAGE_SIZE),
+    })
+    if (error) throw error
+    rows.push(...(data as EventOverviewRow[]).map((row) => ({
+      eventId: row.event_id,
+      departmentIds: row.department_ids,
+      yearLevels: row.year_levels,
+      summary: {
+        expected: Number(row.expected),
+        checkedIn: Number(row.checked_in),
+        remaining: Number(row.remaining),
+        present: Number(row.present),
+        late: Number(row.late),
+        checkedOut: Number(row.checked_out),
+      },
+    })))
   }
+  return rows
 }
 
 export async function updateEvent(eventId: string, input: EventInput, status: EventStatus) {

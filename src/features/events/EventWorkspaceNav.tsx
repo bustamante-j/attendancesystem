@@ -2,14 +2,15 @@ import { BarChart3, CalendarDays, ClipboardList, ScanLine } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import type { EventRecord } from '../../types/app'
 
-export function EventWorkspaceNav({ eventRecord, active, canViewReports }: {
+export function EventWorkspaceNav({ eventRecord, active, canViewReports, canViewRoster = true }: {
   eventRecord: EventRecord
   active: 'roster' | 'scanner'
   canViewReports: boolean
+  canViewRoster?: boolean
 }) {
   const items = [
     { label: 'All events', to: '/events', icon: CalendarDays, active: false },
-    { label: 'Roster', to: `/events/${eventRecord.id}/attendance`, icon: ClipboardList, active: active === 'roster' },
+    ...(canViewRoster ? [{ label: 'Roster', to: `/events/${eventRecord.id}/attendance`, icon: ClipboardList, active: active === 'roster' }] : []),
     ...(!eventRecord.is_historical ? [{ label: 'Scanner', to: `/events/${eventRecord.id}/scanner`, icon: ScanLine, active: active === 'scanner' }] : []),
     ...(canViewReports ? [{ label: 'Reports', to: `/reports?event=${eventRecord.id}`, icon: BarChart3, active: false }] : []),
   ]
